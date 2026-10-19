@@ -1,0 +1,30 @@
+name: DeckVerse CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  engine-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate syntax
+        run: |
+          node --check src/catalog.js
+          node --check src/engine.js
+          node --check src/app.js
+          node --check api/game.js
+          node --check api/livekit-token.js
+      - name: Test rules and invariants
+        run: npm test
+      - name: Audit deck comparisons
+        run: npm run balance
