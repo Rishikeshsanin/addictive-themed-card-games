@@ -8,3 +8,25 @@ test('tie pot carries cards and the second consecutive tie switches chooser',()=
 test('bad actors and unknown stats cannot select',()=>{const g=newGame({picker:()=>0,chooser:0});assert.throws(()=>takeTurn(g,1,'rank'));assert.throws(()=>takeTurn(g,0,'money'))});
 test('conservation across 1000 legal turns',()=>{let g=newGame({picker:()=>0,chooser:0});for(let i=0;i<1000&&g.status==='playing';i++){const who=g.chooser;const c=card(g.players[who].deck[0]);const key=STAT_FIELDS[(c.id+i)%8].key;g=takeTurn(g,who,key);validate(g);}assert.equal(g.total,50)});
 test('balance calculation uses all eight categories for all pairs',()=>{for(const [n,pairs] of [[2,1225],[3,1770],[4,3160]]){const b=benchmark(DECKS[n]);assert.equal(b.pairs,pairs);assert.equal(b.comparisons,pairs*8)}});
+test('power alternates only after every second consecutive tie',()=>{
+ const g=newGame({ids:DECKS[2],picker:()=>0,chooser:0});
+ let pair1=null,pair2=null;
+ for(const a of g.players[0].deck)for(const b of g.players[1].deck){
+  const k=STAT_FIELDS.find(x=>x.key!=='rank'&&card(a)[x.key]===card(b)[x.key]);
+  if(!k)continue;
+  if(!pair1)pair1=[a,b,k.key];
+  else if(a!==pair1[0]&&b!==pair1[1]&&!pair2)pair2=[a,b,k.key];
+ }
+ assert.ok(pair1&&pair2,'Need two disjoint tied pairs in the curated deck');
+ g.players[0].deck=[pair1[0],pair2[0],...g.players[0].deck.filter(id=>id!==pair1[0]&&id!==pair2[0])];
+ g.players[1].deck=[pair1[1],pair2[1],...g.players[1].deck.filter(id=>id!==pair1[1]&&id!==pair2[1])];
+ const t1=takeTurn(g,0,pair1[2]);assert.equal(t1.pot.length,2);assert.equal(t1.chooser,0);
+ const t2=takeTurn(t1,0,pair2[2]);assert.equal(t2.pot.length,4);assert.equal(t2.chooser,1);
+ const t3=takeTurn(t2,1,'rank');assert.equal(t3.pot.length,0);assert.equal(t3.consecutiveTies,0);
+ assert.equal(t3.last.awarded.length,6);validate(t3);
+});
+test('two-player deck is balanced under all category comparisons',()=>{
+ const b=benchmark(DECKS[2]);
+ assert.equal(b.completeDominance,0);
+ assert.ok(b.score.every(x=>x.rate>.44&&x.rate<.56),'All 50 cards must be within the agreed game-only win band');
+});
