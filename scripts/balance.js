@@ -1,0 +1,2 @@
+import {DECKS} from '../src/catalog.js';import {benchmark} from '../src/engine.js';
+for(const size of [2,3,4]){const x=benchmark(DECKS[size]);const top=[...x.score].sort((a,b)=>b.rate-a.rate).slice(0,5);const bottom=[...x.score].sort((a,b)=>a.rate-b.rate).slice(0,5);console.log(JSON.stringify({players:size,cards:x.cards,pairs:x.pairs,comparisons:x.comparisons,completeDominance:x.completeDominance,dominance:x.dominance,top,bottom},null,2));}
