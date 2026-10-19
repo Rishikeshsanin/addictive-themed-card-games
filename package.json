@@ -7,7 +7,8 @@
     "dev": "npx serve . -p 4173",
     "test": "node --test tests/*.test.js",
     "balance": "node scripts/balance.js",
-    "test:ui": "node tests/ui-smoke.mjs"
+    "test:ui": "node tests/ui-smoke.mjs",
+    "simulate": "node scripts/simulate.js 2000"
   },
   "dependencies": {
     "postgres": "^3.4.5",
