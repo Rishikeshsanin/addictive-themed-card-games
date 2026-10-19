@@ -27,6 +27,7 @@ try {
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
  assert.equal(await page.locator('.theme-card').count(),3);
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
+ if(overflow>2)console.log('OVERFLOW ELEMENTS',JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].map(e=>{const r=e.getBoundingClientRect();return {tag:e.tagName,cls:typeof e.className==='string'?e.className:'',right:Math.round(r.right),left:Math.round(r.left),w:Math.round(r.width),scroll:e.scrollWidth}}).filter(e=>e.right>window.innerWidth+4||e.left<-4).sort((a,b)=>b.right-a.right).slice(0,18))));
  assert.ok(overflow<=2,'Mobile viewport should not overflow, overflow='+overflow);
  await page.screenshot({path:'/tmp/deckverse-mobile.png',fullPage:true});
  await page.locator('#pokemon-tile').click();
