@@ -4,13 +4,28 @@ const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms
 let screen='landing',mode='same',session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
 const symbols={rank:'♛',height:'↕',weight:'◆',attack:'⚔',defense:'⬡',speed:'⚡',energy:'✧',hp:'♥'};
 const elements=['landing','setup','lobby','battle'];
-function show(id){screen=id;for(const el of elements)$(el).classList.toggle('hidden',el!==id);if(id!=='landing')window.scrollTo(0,0);if(id==='landing')location.hash='';}
+function show(id){screen=id;for(const el of elements)$(el).classList.toggle('hidden',el!==id);if(id!=='landing')window.scrollTo(0,0);if(id==='landing')location.hash='';if(id==='setup')checkRoomHealth();}
 let toastTimer;
 function toast(text){$('toast').textContent=text;$('toast').classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),3800)}
 function displayName(){return ($('player-name').value.trim()||localStorage.getItem('deckverse_name')||'Player').slice(0,24)}
 function saveName(){localStorage.setItem('deckverse_name',displayName())}
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
 function pokemonCard(c,chosen=''){if(!c)return '<div class="card-back"><span>✦</span></div>';const vals=STAT_FIELDS.map(s=>'<div class="card-bar '+(s.key===chosen?'best':'')+'"><span>'+symbols[s.key]+' '+(s.key==='energy'?'ENERGY':s.name)+'</span><b>'+Number(c[s.key]).toLocaleString(undefined,{maximumFractionDigits:2})+'</b></div>').join('');return '<div class="card-top"><span>NO. '+String(c.id).padStart(3,'0')+'</span><span>THE ORIGINALS</span></div><div class="card-art"><img src="'+art(c.id)+'" alt="" loading="eager" onerror="this.style.display=\'none\'"/></div><div class="card-name">'+escapeHtml(c.name.toUpperCase())+'</div><div class="card-bars">'+vals+'</div>'}
+async function checkRoomHealth(){
+ const message=$('room-availability'),create=$('create-room'),join=$('join-room');
+ if(!message||!create||!join)return;
+ message.textContent='Checking private game servers…';create.disabled=true;join.disabled=true;
+ try{
+  const response=await fetch('/api/game?health=1',{cache:'no-store'});
+  const data=await response.json();
+  if(response.ok&&data.status==='ready'){
+   message.textContent='● ONLINE ROOMS ARE READY';message.classList.remove('offline');
+   create.disabled=false;join.disabled=false;return;
+  }
+ }catch{}
+ message.textContent='● ONLINE ROOMS ARE BEING CONNECTED — SOLO PRACTICE IS PLAYABLE';
+ message.classList.add('offline');
+}
 function setupScreen(){clearInterval(poll);poll=null;clearTimeout(botTimer);practice=null;session=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
 function init(){
  $('player-name').value=localStorage.getItem('deckverse_name')||'';
