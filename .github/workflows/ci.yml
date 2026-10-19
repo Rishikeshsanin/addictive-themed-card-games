@@ -27,6 +27,8 @@ jobs:
       - name: Audit deck comparisons
         run: npm run balance
 
+      - name: Simulate 2000 complete classic matches
+        run: npm run simulate
       - name: Start static server
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/deckverse-http.log 2>&1 &
