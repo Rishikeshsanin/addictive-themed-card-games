@@ -1,0 +1,17 @@
+{
+  "name": "DeckVerse — Addictive Themed Card Games",
+  "short_name": "DeckVerse",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080817",
+  "theme_color": "#080817",
+  "description": "Old-school rivalry, new-school magic",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
