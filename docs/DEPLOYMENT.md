@@ -19,7 +19,7 @@ ALTER ROLE deckverse_app WITH LOGIN PASSWORD '<YOUR_LONG_RANDOM_UNIQUE_PASSWORD>
 This intentionally changes only the already-created DeckVerse app's PostgreSQL role, not database-wide keys or other app roles.
 Then go to the **new DeckVerse Vercel project** (not Imposter X, BlindRank or any other app), Settings > Environment Variables, and add `DECKVERSE_DATABASE_URL` using the connection string from the Project Hub **Connect** menu. Select the **dedicated role** `deckverse_app`, use the host/port exactly displayed for transaction or session pooler and the generated password; do not use `postgres`, `service_role`, `supabase_admin` or shared credentials. Vercel environment type must be Sensitive/Encrypted and server-only; set production and preview as appropriate, then redeploy.
 
-The isolated Vercel API endpoint `/api/game/health` must return `{"status":"ready","app":"deckverse"}` before testing friend-to-friend room create, join and play. If it returns `setup_required`, stop and troubleshoot connectivity without widening permissions.
+The isolated Vercel API endpoint `/api/game?health=1` must return `{"status":"ready","app":"deckverse"}` before testing friend-to-friend room create, join and play. If it returns `setup_required`, stop and troubleshoot connectivity without widening permissions.
 
 ## LiveKit calling — setup needed
 Create or designate a LiveKit environment specifically authorized for DeckVerse. In the **new DeckVerse Vercel project**, configure:
