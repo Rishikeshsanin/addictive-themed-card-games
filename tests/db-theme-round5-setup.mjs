@@ -51,7 +51,7 @@ try{
  game.revealPolicy={mode:'auto',seconds:2};
  assert.equal(validateServerThemeMatch(game,'pokemon'),true);
  const token0='a'.repeat(64),token1='b'.repeat(64);
- const seeded=await admin.unsafe("UPDATE deckverse.rooms SET state=$1::jsonb WHERE code='ABC123' RETURNING code,jsonb_typeof(state) AS kind,state->>'status' AS phase",[JSON.stringify(game)]);
+ const seeded=await admin.unsafe("UPDATE deckverse.rooms SET state=$1::jsonb WHERE code='ABC123' RETURNING code,jsonb_typeof(state) AS kind,state->>'status' AS phase",[game]);
  assert.equal(seeded.length,1,"Legacy playing room must exist for seeded state");
  assert.deepEqual({kind:seeded[0].kind,phase:seeded[0].phase},{kind:"object",phase:"playing"});
  console.log("ROUND5_LEGACY_FIXTURE_GAME_SEEDED",seeded[0].code,seeded[0].kind,seeded[0].phase);
