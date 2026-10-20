@@ -293,3 +293,91 @@ test('unknown theme/count and unauthorized stored theme switches are rejected',(
   assert.throws(()=>takeServerThemeTurn(a,0,'rank',{roomThemeId:'ben10'}),/mismatch/);
   assert.throws(()=>themeViewFor(a,0,{roomThemeId:'ben10'}),/mismatch/);
 });
+
+
+test('seven theme 2P double-tie rotates chooser, then rank sudden death preserves all cards',()=>{
+  for(const themeId of THEMES.slice(1)){
+    const base=startServerThemeMatch({themeId,playerCount:2,picker,chooser:0});
+    let pair;
+    for(const category of getServerTheme(themeId).categories.slice(1)){
+      for(const a of base.players[0].deck){
+        const b=base.players[1].deck.find(x=>
+          getServerCard(themeId,a).stats[category.key]===
+          getServerCard(themeId,x).stats[category.key]);
+        if(b!==undefined){pair={a,b,key:category.key};break;}
+      }
+      if(pair)break;
+    }
+    assert.ok(pair,themeId+' missing tie fixture');
+    const double=structuredClone(base);
+    for(const [deck,want] of [[double.players[0].deck,pair.a],
+      [double.players[1].deck,pair.b]]){
+      const at=deck.indexOf(want);[deck[0],deck[at]]=[deck[at],deck[0]];
+      double.pot.push(deck.splice(1,1)[0]);
+    }
+    double.consecutiveTies=1;
+    assert.equal(validateServerThemeMatch(double,themeId),true);
+    const tied=takeServerThemeTurn(double,0,pair.key);
+    assert.equal(tied.last.kind,'tie',themeId);
+    assert.equal(tied.consecutiveTies,2,themeId);
+    assert.equal(tied.chooser,1,themeId);
+    assert.equal(tied.pot.length,4,themeId);
+    assert.equal(validateServerThemeMatch(tied,themeId),true);
+
+    const sudden=structuredClone(base);
+    const all=[...base.players[0].deck,...base.players[1].deck];
+    sudden.players=[{deck:[pair.a]},{deck:[pair.b]}];
+    sudden.pot=all.filter(x=>x!==pair.a&&x!==pair.b);
+    assert.equal(sudden.pot.length,48);
+    const finish=takeServerThemeTurn(sudden,0,pair.key);
+    assert.equal(finish.last.kind,'sudden-death',themeId);
+    assert.equal(finish.status,'finished');
+    assert.equal(finish.players[finish.winner].deck.length,50);
+    assert.equal(finish.pot.length,0);
+    const bestRank=getServerCard(themeId,pair.a).stats.rank<
+      getServerCard(themeId,pair.b).stats.rank?0:1;
+    assert.equal(finish.winner,bestRank);
+    assert.equal(validateServerThemeMatch(finish,themeId),true);
+    assert.equal(themeViewFor(finish,finish.winner).last.awarded,undefined);
+  }
+});
+test('all expansion 3P/4P multiway sudden-death awards unique rank winner once',()=>{
+  for(const themeId of THEMES.slice(1))for(const n of [3,4]){
+    const state=startServerThemeMatch({themeId,playerCount:n,picker,chooser:0});
+    const cards=getServerManifest(themeId,n);
+    let selected,key;
+    for(const category of getServerTheme(themeId).categories.slice(1)){
+      const groups=new Map();
+      for(const id of cards){
+        const value=getServerCard(themeId,id).stats[category.key];
+        if(!groups.has(value))groups.set(value,[]);
+        groups.get(value).push(id);
+      }
+      for(const value of [...groups.keys()].sort((a,b)=>b-a)){
+        const winners=groups.get(value);
+        const below=cards.filter(id=>getServerCard(themeId,id).stats[category.key]<value);
+        if(winners.length>=2&&below.length>=n-2){
+          selected=[winners[0],winners[1],...below.slice(0,n-2)];
+          key=category.key;break;
+        }
+      }
+      if(selected)break;
+    }
+    assert.ok(selected,themeId+'/'+n+' lacks tested multi-tie fixture');
+    const used=new Set(selected);
+    state.players=selected.map(id=>({deck:[id]}));
+    state.pot=cards.filter(id=>!used.has(id));
+    assert.equal(validateServerThemeMatch(state,themeId),true);
+    const next=takeServerThemeTurn(state,0,key);
+    const expected=selected.map((id,seat)=>({
+      seat,rank:getServerCard(themeId,id).stats.rank
+    })).sort((a,b)=>a.rank-b.rank)[0].seat;
+    assert.equal(next.last.kind,'sudden-death',themeId+'/'+n);
+    assert.equal(next.winner,expected);
+    assert.equal(next.status,'finished');
+    assert.equal(next.pot.length,0);
+    assert.equal(next.players[expected].deck.length,DECK_SIZE_BY_PLAYERS[n]);
+    assert.equal(validateServerThemeMatch(next,themeId),true);
+    assert.ok(!JSON.stringify(themeViewFor(next,0)).includes('"deck"'));
+  }
+});
