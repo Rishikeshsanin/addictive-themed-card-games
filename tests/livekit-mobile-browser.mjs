@@ -67,7 +67,8 @@ try{
   assert.equal(await page.evaluate(()=>window.__rooms[0].localParticipant.isCameraEnabled),false);
   await page.locator('#call-camera').click();
   await page.waitForFunction(()=>window.__rooms[0].localParticipant.isCameraEnabled);
-  await page.locator('#local-video video').waitFor();
+  await page.locator('#call-minimize').click(); // Dock starts minimized on phones; expand before checking the visual preview.
+  await page.locator('#local-video video').waitFor({state:'visible',timeout:10000});
   await page.locator('#call-mic').click();
   assert.equal(await page.evaluate(()=>window.__rooms[0].localParticipant.isMicrophoneEnabled),false);
   await page.locator('#call-leave').click();
