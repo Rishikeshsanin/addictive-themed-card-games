@@ -224,6 +224,14 @@ test('bounded indexed cleanup reclaims expired rows under limited role',async()=
    SELECT 'db-cleanup', repeat(md5(g::text),2),
      statement_timestamp()-interval '1 hour',statement_timestamp()-interval '5 minutes',1
    FROM generate_series(1,700) g`);
+ const explain=await app.unsafe(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+   SELECT ctid FROM deckverse.rate_limit_counters
+   WHERE expires_at < statement_timestamp()
+   ORDER BY expires_at LIMIT 256 FOR UPDATE SKIP LOCKED`);
+ const plan=explain[0]['QUERY PLAN'][0];
+ const naturalIndexUse=JSON.stringify(plan.Plan).includes('deckverse_rate_limit_expiry_idx');
+ console.log(JSON.stringify({scenario:'expiry-cleanup-plan',usedIndex:naturalIndexUse,
+   rootNode:plan.Plan['Node Type'],executionMs:plan['Execution Time']}));
  let removed=0;const sizes=[];
  for(let i=0;i<3;i++){
   const n=await cleanupExpired(app,{batch:256});
