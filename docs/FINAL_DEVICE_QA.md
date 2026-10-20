@@ -61,6 +61,18 @@ A *conditional software QA pass* requires: latest candidate CI green including t
 
 **Until then: NO-GO for unconditional production release.** Keep this PR draft and unmerged. The original gameplay/IP licensing requirements also remain separate public-launch gates.
 
-## Execution log
+## Executed final CI evidence — 2026-10-20
 
-Populated only from real GitHub workflow results; do not infer success from previous branch's passing runs. The PR description will link exact latest run and evidence.
+**Latest code commit:** `8e7b892f8a2490ddd83bc9943972d29b35697a54`. [GitHub Actions run 39460032623](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39460032623) completed **FAIL, by design because the QA uncovered a genuine shared UI blocker**.
+
+- **95/96 Node test subtests passed**, one final calling regression failed on the confirmed call-overlay issue. Do not report aggregate CI green.
+- **Synthetic multiplayer PASS:** 2P, 3P and 4P independent Chromium sessions: create/join/ready/start, one real pure-engine round with shared reveal, hidden future cards, browser offline→online notices, unchanged decks, synthetic presence pause and host-transfer UI, retained session after reload, seeded terminal state followed by unanimous rematch. **No PostgreSQL/production API in these new browser tests.**
+- **Responsive gameplay PASS:** measured `window.scrollX=0`, `rawOverflow=0`, no clipped card/stat controls in **18 recorded battle/rematch context-viewport snapshots** spanning 320, 390, 768 and 1366 pixels. All tested landing/setup/lobby views also passed viewport assertions. This verifies the original **240px decorative horizontal overflow is fixed in this baseline**.
+- **Synthetic call lifecycle PASS:** microphone and camera denial with retry; camera never auto-enabled; synthetic mic/camera tracks; explicit audio unlock; reconnect/reconnected and background visibility messages; duplicate mock remote audio attachment suppressed; three repeated call/video/leave cycles with all tracks ended, listeners removed, no remaining media elements, no automatic capture after refresh. This does *not* measure real microphone sound, true ICE/network reconnection, heap allocation or iOS autoplay.
+- **NEW CONFIRMED SHARED UI FAILURE:** Expanded call dock visibly overlaps and **intercepts pointer hits** on **4 enabled stat buttons at 768px** and **2 enabled stat buttons at 1366px**. At **320px and 390px**, the same expanded call test did not intercept stat buttons. The dock uses a fixed right/bottom desktop position and `z-index:35`; coordinator/owner of shared `styles.css` should fix its placement (for example keep it away from the stat-grid, within safe areas and without adding horizontal scroll), then rerun this entire test before integration. Agent E has **not** edited `styles.css`, `src/app.js`, or `src/livekit-call.js`.
+- **Screenshots:** [GitHub Actions artifact `deckverse-browser-screenshots`](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39460032623/artifacts/12283080453) includes simulated player viewport images, `deckverse-final-call-overlap-768.png` and `deckverse-final-call-overlap-1366.png`. These are **headless Chromium screenshots, not real phones**.
+- **No production writes:** This lane runs local static files plus browser-intercepted fake room/token API responses and simulated LiveKit SDK. No LiveKit Cloud, Project Hub, secrets, DB migrations or cross-app modifications.
+
+### Release decision
+
+**NO-GO for unconditional V2 release.** The original 240px horizontal-scroll issue is resolved in synthetic Chromium, but the expanded call dock's intercepted stat buttons are a newly reproducible usability blocker. Coordinator must fix shared CSS, establish a green head-commit CI run and review independent PostgreSQL suites. Real iPhone Safari/Android Chrome, actual audio/video and network handoff remain **physical-device pending**. This PR must remain draft until review.
