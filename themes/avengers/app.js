@@ -59,7 +59,9 @@ function closeDetails(){
 }
 function stopTimers(){epoch++;clearTimeout(timer);clearTimeout(botTimer);timer=null;botTimer=null}
 function startGame(){
- stopTimers();revealing=false;game=newDuel();
+ stopTimers();revealing=false;
+ const qaChooser=(['localhost','127.0.0.1'].includes(location.hostname)&&new URLSearchParams(location.search).has('qa-chooser'))?0:null;
+ game=newDuel({chooser:qaChooser});
  $('arena').classList.remove('hidden');
  $('match-complete').classList.add('hidden');
  $('result-panel').classList.add('hidden');
