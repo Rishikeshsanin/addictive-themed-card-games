@@ -1,0 +1,94 @@
+name: DeckVerse Round 5 theme HTTP / PostgreSQL 17.6 QA
+
+on:
+  pull_request:
+    paths:
+      - 'tests/db-theme-round5-*.mjs'
+      - '.github/workflows/db-theme-round5.yml'
+      - 'api/game.js'
+      - 'src/server/theme-*.js'
+      - 'migrations/004_multiplayer_rooms.sql'
+      - 'migrations/005_deckverse_rate_limits.sql'
+      - 'migrations/006_deckverse_presence.sql'
+      - 'migrations/007_theme_rooms.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  theme-http-postgres-17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: deckverse_round5_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: round5_fake_admin_only
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d deckverse_round5_ci"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 25
+    env:
+      DECKVERSE_ROUND5_DISPOSABLE: 'YES'
+      ROUND5_PG_ADMIN_URL: 'postgres://postgres:round5_fake_admin_only@127.0.0.1:5432/deckverse_round5_ci?sslmode=require'
+      DECKVERSE_DATABASE_URL: 'postgres://deckverse_app:round5_fake_local_only@127.0.0.1:5432/deckverse_round5_ci?sslmode=require'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Enable TLS on disposable PostgreSQL 17.6
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID="$(docker ps --filter 'ancestor=postgres:17.6' --format '{{.ID}}' | head -n 1)"
+          test -n "$CID"
+          docker exec --user root "$CID" bash -ec '
+            openssl req -new -newkey rsa:2048 -nodes -x509 -days 1 \
+              -subj "/CN=localhost" \
+              -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+              -keyout /var/lib/postgresql/data/server.key \
+              -out /var/lib/postgresql/data/server.crt >/dev/null 2>&1
+            chown postgres:postgres /var/lib/postgresql/data/server.key /var/lib/postgresql/data/server.crt
+            chmod 0600 /var/lib/postgresql/data/server.key
+          '
+          docker exec "$CID" psql -U postgres -d deckverse_round5_ci -X -v ON_ERROR_STOP=1 \
+            -c "ALTER SYSTEM SET ssl = 'on'"
+          docker exec "$CID" psql -U postgres -d deckverse_round5_ci -X -v ON_ERROR_STOP=1 \
+            -c 'SELECT pg_reload_conf()'
+          for i in $(seq 1 25); do
+            MODE="$(docker exec "$CID" psql -U postgres -d deckverse_round5_ci -At -c 'SHOW ssl')"
+            if [ "$MODE" = on ]; then break; fi
+            sleep 1
+          done
+          test "$MODE" = on
+          NUM="$(docker exec "$CID" psql -U postgres -d deckverse_round5_ci -At -c 'SHOW server_version_num')"
+          test "$NUM" = 170006
+          echo "ROUND5_DISPOSABLE_PG_VERSION=$NUM"
+          docker cp "$CID":/var/lib/postgresql/data/server.crt "$RUNNER_TEMP/deckverse-round5-cert.crt"
+          echo "NODE_EXTRA_CA_CERTS=$RUNNER_TEMP/deckverse-round5-cert.crt" >> "$GITHUB_ENV"
+
+      - name: Validate fixture scripts syntax
+        run: |
+          node --check tests/db-theme-round5-setup.mjs
+          node --check tests/db-theme-round5-e2e.mjs
+
+      - name: Create fictional legacy rooms; apply migrations 004-007 atomically
+        run: node tests/db-theme-round5-setup.mjs
+
+      - name: Real localhost HTTP + restricted-role PostgreSQL theme E2E
+        run: node tests/db-theme-round5-e2e.mjs
+
+      - name: Report disposable-only test boundary
+        if: success()
+        run: echo "PASS Round5: 8 themes x 2/3/4, rematch, concurrency, host/session recovery; no Supabase connection."
