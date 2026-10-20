@@ -67,10 +67,16 @@ test('Round 5: isolated PostgreSQL + real Chromium 8 themes x 2/3/4 players (fro
   run('docker',['cp',cert,container+':/var/lib/postgresql/data/server.crt']);
   run('docker',['exec','-u','root',container,'chown','postgres:postgres','/var/lib/postgresql/data/server.key','/var/lib/postgresql/data/server.crt']);
   run('docker',['exec','-u','root',container,'chmod','600','/var/lib/postgresql/data/server.key']);
-  run('docker',['exec','-u','postgres',container,'psql','-U','postgres','-d',repoDB,
-   '-v','ON_ERROR_STOP=1','-c',"ALTER SYSTEM SET ssl = 'on'",
-   '-c',"ALTER SYSTEM SET ssl_cert_file = '/var/lib/postgresql/data/server.crt'",
-   '-c',"ALTER SYSTEM SET ssl_key_file = '/var/lib/postgresql/data/server.key'"],{silent:true});
+  // PostgreSQL's image can report pg_isready=true during the temporary
+  // init server and then restart into the real server. Retry only this local
+  // disposable TLS configuration across that brief startup transition.
+  await waitFor(()=>{
+   run('docker',['exec','-u','postgres',container,'psql','-U','postgres','-d',repoDB,
+    '-v','ON_ERROR_STOP=1','-c',"ALTER SYSTEM SET ssl = 'on'",
+    '-c',"ALTER SYSTEM SET ssl_cert_file = '/var/lib/postgresql/data/server.crt'",
+    '-c',"ALTER SYSTEM SET ssl_key_file = '/var/lib/postgresql/data/server.key'"],{silent:true});
+   return true;
+  },{attempts:50,delay:600});
   run('docker',['kill','--signal=HUP',container],{silent:true});
   await waitFor(()=>run('docker',['exec','-u','postgres',container,'psql','-U','postgres','-d',repoDB,'-tAc','SHOW ssl'],{silent:true}).trim()==='on');
   await step('tests/db-integration-mobile-setup.mjs',env,{timeout:120000});
