@@ -492,10 +492,16 @@ export const PACK_ROSTERS = {
       ]
     },
     {
+      "group": "Wicketkeepers & Captains",
+      "role": "keeper",
+      "names": [
+        "MS Dhoni"
+      ]
+    },
+    {
       "group": "All-rounders",
       "role": "allround",
       "names": [
-        "MS Dhoni",
         "Kapil Dev",
         "Hardik Pandya",
         "Ravindra Jadeja",
