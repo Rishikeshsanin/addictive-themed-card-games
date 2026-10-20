@@ -50,12 +50,26 @@ The bootstrap intentionally fails if roles/tables already exist; start with a fr
 
 **Terminology:** "real API + disposable PostgreSQL" does not mean deployed V2. "Synthetic browser verified" does not imply physical iPhone or Android. Calling fixture uses a stubbed client; it does not establish peer-to-peer audio, prove autoplay semantics on Safari, or test actual LiveKit ICE/DTLS reconnection.
 
-## Findings from initial isolated CI executions
+## Executed GitHub Actions evidence (2026-10-20)
 
-- The new CI PostgreSQL 16 TLS service, synthetic V1 fixture, local scoped application of SQL 004/005/006, and **all 6 LiveKit lifecycle mock tests passed** in the first dedicated workflow.
-- Real local API + browser **2-player** create/join/start, offline→online+refresh preservation, mocked LiveKit token access checks, synthetic mic/camera controls and unanimous seeded rematch passed before later checks.
-- The next CI run exposed a **tablet responsive defect**: on a 3-player battle, **seat 1 at 768px viewport**, `document.documentElement.scrollWidth > innerWidth + 2px`. Agent E cannot modify shared CSS/HTML. The suite now captures overflow in an artifact, continues through other scenarios, and **fails at the end** to maintain a visible release gate. **Coordinator/Agent D action:** fix the 3P responsive overflow after inspecting the recorded overwide elements/screenshots, and rerun.
-- These are *partial* findings; the dedicated CI remains a failing release gate until all tests finish successfully. Do not mistake the independent legacy CI success for integrated mobile QA success.
+**Latest fully evaluated integration code run:** [39453605939](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39453605939) — **FAIL, correctly blocked on responsive horizontal scrolling**. The independent DeckVerse CI on the earlier compatible commit passed; it does not override this new gate.
+
+- **20 scenario groups passed** under disposable PostgreSQL + Chromium, including real API-backed 2/3/4 creation/join/start, player counts and card privacy; all three room reconnect/refresh/card-preservation checks; 3P stale-host transfer with correct pause and recovery; all three browser-driven rematches (test-only finished-state fixture); forged vs legitimate LiveKit token access using fictional signing credentials; synthetic mic/camera/audio-unlock/mute/leave; durable create throttling 429/Retry-After; unobstructed expanded call dock at 390px.
+- **6/6 existing LiveKit lifecycle/mock permission tests passed** in the same workflow.
+- **Three viewport groups failed**: 3P at 768px; 4P at 768px and 1366px. Each had **240px actual horizontal scroll** (`window.scrollX=240` after a direct scroll), not just a large DOM scrollWidth. The overwide element is decorative `.ambient-a` (right edge 1008px at 768px; 1606px at 1366px). **Gameplay card/button bounds remained inside viewport** in these tested layouts, so this is horizontal page scrolling rather than proven card obstruction. Fix belongs to the **coordinator/Agent D**, not Agent E; consider clipping the decorative layer at a correctly bounded ancestor and verify `scrollX=0` without hiding interactive content.
+- Chromium emulation screenshots + timing JSON: [run artifact deckverse-disposable-mobile-qa](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39453605939/artifacts/12278883918). Files `overflow-3p-768.png`, `overflow-4p-768.png`, `overflow-4p-1366.png` and cross-device captures are simulated browser screenshots only.
+- **Measured local-CI performance (not real-device or network latency):**
+
+| Action | Samples | p50 | p95 | Max |
+|---|---:|---:|---:|---:|
+| Browser room creation | 3 | 67.3 ms | 91.5 ms | 91.5 ms |
+| Browser room joining | 6 | 134.5 ms | 281.2 ms | 281.2 ms |
+| API get | 15 | 8.2 ms | 63.2 ms | 63.2 ms |
+| API rematch | 3 | 9.2 ms | 9.5 ms | 9.5 ms |
+| API heartbeat | 2 | 8.5 ms | 8.8 ms | 8.8 ms |
+| API select (paused rejection) | 1 | 7.0 ms | 7.0 ms | 7.0 ms |
+
+Small sample sizes and a loopback CI service prohibit generalizing these figures to real Vercel/Supabase/mobile performance. A subsequent documentation-only commit may produce a new CI run; evaluate that separately.
 
 ## CI reproducibility and performance
 
