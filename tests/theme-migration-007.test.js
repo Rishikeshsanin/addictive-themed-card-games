@@ -67,7 +67,7 @@ test('PG17.6 disposable rehearsal: 007 atomic rollback, legacy data, theme IDs, 
       '--tmpfs','/var/lib/postgresql/data:rw','-e','POSTGRES_PASSWORD='+password,
       '-e','POSTGRES_DB='+database,'postgres:17.6']);
    started=true;
-   sql=postgres({host:'127.0.0.1',port,username:'postgres',password,database,ssl:false,max:5,connect_timeout:2});
+   sql=postgres({host:'127.0.0.1',port,username:'postgres',password,database,ssl:false,max:1,connect_timeout:2});
    let connected=false;
    for(let i=0;i<60;i++){try{await one('SELECT 1 AS ready');connected=true;break}
      catch{await new Promise(r=>setTimeout(r,650))}}
