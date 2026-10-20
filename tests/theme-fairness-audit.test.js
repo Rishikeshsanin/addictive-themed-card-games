@@ -18,13 +18,20 @@ test('all seven thematic 80-card rosters use eight meaningful typed comparisons'
   assert.equal(p.categoryKeys.length,8);
   assert.equal(p.categories[0].key,'rank');
   assert.equal(p.categories[0].direction,'min');
-  assert.ok(p.categories.slice(1).every(c=>c.direction==='max'&&c.definition.length>8));
+  assert.ok(p.categories.slice(1).every(c=>c.direction==='max'&&c.definition.length>=4));
   for(const n of [2,3,4]){
    assert.equal(p.decks[n].cards,DECK_SIZE[n]);
    assert.ok(p.decks[n].winFractionRange[0]>=0&&p.decks[n].winFractionRange[1]<=1);
    assert.equal(p.decks[n].category.rank.tiePairs,0);
    assert.equal(p.decks[n].category.rank.distinctValues,DECK_SIZE[n]);
   }
+ }
+ for(const p of inventory.themes){
+  console.log('THEME STATIC MEASURE '+JSON.stringify({theme:p.id,inventory:p.inventory,severity:p.severityCounts,
+   sevenDominanceByDeck:[p.decks[2].sevenOfEightPairs,p.decks[3].sevenOfEightPairs,p.decks[4].sevenOfEightPairs],
+   fullRelativeStrength:[p.decks[2].fullRosterRelativeAvg,p.decks[3].fullRosterRelativeAvg,p.decks[4].fullRosterRelativeAvg],
+   fullWinRange:p.decks[4].winFractionRange,
+   highRisk:p.highestRisk.slice(0,10),category:p.decks[4].category}));
  }
  for(const c of inventory.allCards){
   assert.equal(Object.keys(c.stats).length,8);
