@@ -196,15 +196,12 @@ async function suite(n){
  const started=await readyAndStart(r);
  assert.deepEqual(started.game.counts,Array(n).fill(n===2?25:20));
  await inspect(r);
- // Coordinator-owned API currently converts plain engine assertion errors to 503.
- // Log this as a deployment blocker rather than representing 503 as a valid 4xx.
- for(const payload of [
-  {...auth(r,(started.game.chooser+1)%n),expectedRound:0,stat:'rank'},
-  {...auth(r,started.game.chooser),expectedRound:0,stat:'not-a-stat'}]){
-  const wrong=await invoke('select',payload,newIP());
-  assert.ok([400,503].includes(wrong.status),'Invalid turn unexpectedly accepted: '+JSON.stringify(wrong));
-  if(wrong.status===503){errors.push('COORDINATOR API: invalid actor/category returns 503 instead of 400');}
- }
+ // An authenticated non-chooser is forbidden; an unknown category is a bad request.
+ // Both are client mistakes, not a backend-outage 503.
+ const notChooser=await invoke('select',{...auth(r,(started.game.chooser+1)%n),expectedRound:0,stat:'rank'},newIP());
+ assert.equal(notChooser.status,403,'Non-chooser must be rejected as forbidden: '+JSON.stringify(notChooser));
+ const invalidCategory=await invoke('select',{...auth(r,started.game.chooser),expectedRound:0,stat:'not-a-stat'},newIP());
+ assert.equal(invalidCategory.status,400,'Invalid stat must be rejected as bad request: '+JSON.stringify(invalidCategory));
  await choose(r,'rank');
  await rejected('select',{...auth(r,(await row(r)).state.chooser),expectedRound:0,stat:'rank'},r.members[0].ip);
  await rejected('select',{...auth(r,(await row(r)).state.chooser),expectedRound:1,stat:'attack'},r.members[0].ip);
