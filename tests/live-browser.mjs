@@ -34,6 +34,8 @@ try{
  await host.locator('#start-match').click();
  await host.locator('#my-card .card-name').waitFor({timeout:16000});
  await guest.locator('#my-card .card-name').waitFor({timeout:16000});
+ assert.equal(await host.locator('#battle-settings-open').isVisible(),true,'Host sees in-match settings');
+ assert.equal(await guest.locator('#battle-settings-open').isVisible(),false,'Guest cannot edit host reveal settings');
  const chooser=await host.locator('#turn-power').textContent();
  const selecting=chooser.includes('YOU HAVE THE POWER')?host:guest;
  await selecting.locator('.stat-button:not([disabled])').first().click();
@@ -48,6 +50,10 @@ try{
  assert.equal(gMy,hOpp,'Guest drawn card should be the host\'s revealed opponent');
  await host.screenshot({path:'/tmp/deckverse-live-reveal-host.png',fullPage:true});
  await guest.screenshot({path:'/tmp/deckverse-live-reveal-guest.png',fullPage:true});
+ await host.locator('#battle-settings-open').click();
+ await host.locator('#battle-reveal-setting').selectOption('auto-5');
+ await host.waitForFunction(()=>document.querySelector('#battle-settings-status').textContent.includes('Saved!'),{timeout:10000});
+ assert.equal(await host.locator('#result.compact').isVisible(),true,'Current reveal remains manual after setting change');
  await guest.locator('#round-continue').click();
  await guest.waitForFunction(()=>document.getElementById('round-continue')?.textContent.includes('READY'),{timeout:10000});
  assert.equal(await host.locator('.stat-button:not([disabled])').count(),0,'First confirmation must not unlock the round');
