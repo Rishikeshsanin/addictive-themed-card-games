@@ -4,6 +4,8 @@ import {initCallControls,disconnectCall,getCallAvailability} from './livekit-cal
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let screen='landing',mode='same',session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
 let pollBusy=false,actionBusy=false,readyBusy=false,pollTimer=null,revealTimer=null,renderKey='',lobbySnapshot=null,callHealthChecked=false;
+let pollEpoch=0,pollDelay=0,networkState='connected';
+function networkStatus(state){if(networkState===state)return;networkState=state;const box=$('network-status');if(!box)return;box.classList.toggle('hidden',state==='connected');box.textContent=state==='offline'?'OFFLINE · Your room is preserved. Reconnect to continue.':'RECONNECTING · Your cards and room remain safe.';renderKey='';if(screen==='battle'&&game)renderBattle();}
 const symbols={rank:'♛',height:'↕',weight:'◆',attack:'⚔',defense:'⬡',speed:'⚡',energy:'✧',hp:'♥'};
 const elements=['landing','setup','lobby','battle'];
 function show(id){screen=id;for(const el of elements)$(el).classList.toggle('hidden',el!==id);if(id!=='landing')window.scrollTo(0,0);if(id==='landing')location.hash='';if(id==='setup')checkRoomHealth();}
@@ -28,10 +30,13 @@ async function checkRoomHealth(){
  message.textContent='● ONLINE ROOMS ARE BEING CONNECTED — SOLO PRACTICE IS PLAYABLE';
  message.classList.add('offline');
 }
-function stopPolling(){clearInterval(poll);poll=null;clearTimeout(pollTimer);pollTimer=null;pollBusy=false;}
+function stopPolling(){pollEpoch++;clearInterval(poll);poll=null;clearTimeout(pollTimer);pollTimer=null;pollBusy=false;pollDelay=0;}
 function resetReveal(){clearTimeout(revealTimer);revealTimer=null;renderKey='';$('result').classList.add('hidden');}
 function setupScreen(){stopPolling();clearTimeout(botTimer);resetReveal();disconnectCall();callHealthChecked=false;practice=null;session=null;lobbySnapshot=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
 function init(){
+ window.addEventListener('online',()=>{if(session){networkStatus('reconnecting');beginPolling()}});
+ window.addEventListener('offline',()=>{if(session)networkStatus('offline')});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session)beginPolling()});
  $('player-name').value=localStorage.getItem('deckverse_name')||'';
  for(const b of ['top-play','hero-play','pokemon-tile'])$(b).addEventListener('click',setupScreen);
  $('hero-how').addEventListener('click',()=>document.querySelector('#how').scrollIntoView({behavior:'smooth'}));
@@ -115,15 +120,32 @@ function renderLobby(data){
  $('reveal-help').textContent=settings.mode==='manual'?'Both players tap Continue after a reveal (90-second fallback).':`Cards are revealed to BOTH players for ${settings.seconds} seconds.`;
 }
 function beginPolling(){
- stopPolling();let live=true;
+ stopPolling();const epoch=pollEpoch;let fetching=false;
  async function sync(){
-  if(!live||!session)return;
-  if(document.visibilityState==='hidden'||actionBusy||pollBusy){pollTimer=setTimeout(sync,650);return;}
-  pollBusy=true;
-  try{const current=session;const data=await api('get',{code:current.code,token:current.token});if(session===current&&!actionBusy)updateRoom(data)}
-  catch(e){if(/expired|invalid token/i.test(e.message)){session=null;toast('ROOM EXPIRED — START A NEW ONE');show('setup');live=false;return;}}
-  finally{pollBusy=false}
-  if(live&&session)pollTimer=setTimeout(sync,screen==='lobby'?550:1000);
+  if(epoch!==pollEpoch||!session)return;
+  if(fetching||actionBusy||document.visibilityState==='hidden'){
+    pollTimer=setTimeout(sync,450);return;
+  }
+  if(!navigator.onLine){
+    networkStatus('offline');
+    pollTimer=setTimeout(sync,1200);return;
+  }
+  fetching=true;const current=session;
+  try{
+   const data=await api('get',{code:current.code,token:current.token});
+   if(epoch!==pollEpoch||session!==current)return;
+   pollDelay=0;networkStatus('connected');
+   if(!actionBusy)updateRoom(data);
+  }catch(error){
+   if(epoch!==pollEpoch||session!==current)return;
+   if(/expired|invalid token|session expired/i.test(error.message)){
+    networkStatus('offline');session=null;
+    toast('ROOM EXPIRED — REJOIN WITH A CODE');show('setup');stopPolling();return;
+   }
+   pollDelay=Math.min(8000,pollDelay?Math.ceil(pollDelay*1.6):1000);
+   networkStatus(navigator.onLine?'reconnecting':'offline');
+  }finally{fetching=false;}
+  if(epoch===pollEpoch&&session)pollTimer=setTimeout(sync,pollDelay|| (screen==='lobby'?550:1000));
  }
  sync();
 }
@@ -146,7 +168,7 @@ function renderBattle(){
  if(!game)return;
  const me=practice?0:game.me,enemy=1-me,own=game.topCard;
  const active=revealing(),ended=game.status==='finished';
- const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||''].join('|');
+ const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
  if(renderKey===signature)return;
  renderKey=signature;
  $('round-number').textContent=String(game.round+(active?0:ended?0:1)).padStart(2,'0');
@@ -158,7 +180,7 @@ function renderBattle(){
  $('my-card').innerHTML=pokemonCard(myShown,showLast?last.stat:'');
  $('their-card').innerHTML=theirShown?pokemonCard(theirShown,last.stat):'<div class="card-back"><span>✦</span></div>';
  const chooser=game.chooser===me;
- const canPlay=!active&&!ended&&chooser&&!actionBusy;
+ const canPlay=!active&&!ended&&chooser&&!actionBusy&&(practice||networkState==='connected');
  $('battle-status').textContent=active?'BOTH CARDS REVEALED':ended?(game.winner===me?'MATCH WON':'MATCH OVER'):chooser?'YOUR TURN TO CHOOSE':'WAITING ON YOUR RIVAL';
  $('turn-power').textContent=active?'✦ REVIEW YOUR LAST BATTLE':ended?'✦ MATCH COMPLETE':chooser?'✦ YOU HAVE THE POWER':'⌛ YOUR RIVAL HAS THE POWER';
  $('controls-title').textContent=active?'REVIEW THE TWO POKÉMON.':ended?'THE SHOWDOWN IS OVER.':chooser?'THE NEXT MOVE IS YOURS.':'HOLD TIGHT. NEXT CARD IS COMING.';
@@ -233,5 +255,5 @@ function scheduleBot(){
   try{practice=takeTurn(practice,1,key);game={...viewFor(practice,0),me:0,practice:true,reveal:{mode:'auto',seconds:2,acks:[],until:new Date(Date.now()+2000).toISOString()}};renderKey='';renderBattle();scheduleBot()}catch(e){toast(e.message)}
  },revealing()?2300:850);
 }
-async function exitGame(){if(session){try{await api('leave',{code:session.code,token:session.token})}catch{}}await disconnectCall();stopPolling();clearTimeout(botTimer);resetReveal();practice=null;game=null;session=null;callHealthChecked=false;$('battle-settings-panel').classList.add('hidden');lobbySnapshot=null;try{sessionStorage.removeItem('deckverse_session')}catch{}$('result').classList.add('hidden');show('setup')}
+async function exitGame(){if(session){try{await api('leave',{code:session.code,token:session.token})}catch{}}await disconnectCall();stopPolling();networkStatus('connected');clearTimeout(botTimer);resetReveal();practice=null;game=null;session=null;callHealthChecked=false;$('battle-settings-panel').classList.add('hidden');lobbySnapshot=null;try{sessionStorage.removeItem('deckverse_session')}catch{}$('result').classList.add('hidden');show('setup')}
 init();
