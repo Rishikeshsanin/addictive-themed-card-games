@@ -284,7 +284,13 @@ async function run(){
    for(const client of clients)await client.page.locator('#play-again').waitFor({state:'visible',timeout:12000});
    const oldId=(await countDb(host.code)).id;
    for(let i=0;i<count;i++)await clients[i].page.locator('#play-again').click();
-   const restarted=await must('get',{code:host.code,token:host.token});
+   let restarted=null;
+   for(let n=0;n<30;n++){
+    const current=await must('get',{code:host.code,token:host.token});
+    if(current.room.status==='playing' && current.game?.matchNumber===2){restarted=current;break}
+    await new Promise(done=>setTimeout(done,150));
+   }
+   assert.ok(restarted,`${count}P unanimous votes did not commit a rematch`);
    assert.equal(restarted.room.status,'playing');
    assert.equal(restarted.game.matchNumber,2);
    assert.equal(restarted.game.counts.reduce((a,b)=>a+b,0),count===2?50:count===3?60:80);
@@ -322,7 +328,18 @@ async function run(){
  console.log('INTEGRATED MOBILE QA: '+(events.length-failures.length)+' passing groups; '+failures.length+' failing');
  if(failures.length)throw Error('Coordinator-owned V2 release blocker(s): '+failures.map(x=>x.name).join('; '));
 }
-try{await run()}finally{
+try{await run()}catch(error){
+ // Preserve evidence even if a hard assertion interrupts the scenario sequence.
+ const summary=[...new Set(metrics.map(x=>x.name))].map(name=>{
+  const values=metrics.filter(x=>x.name===name).map(x=>x.ms);
+  return {name,samples:values.length,minMs:Math.min(...values),p50Ms:percent(values,.5),p95Ms:percent(values,.95),maxMs:Math.max(...values)};
+ });
+ await (await import('node:fs/promises')).writeFile(join(output,'partial-results.json'),JSON.stringify({
+  status:'INCOMPLETE / FAILED',classification:'disposable local PostgreSQL and synthetic Chromium only',
+  completedGroups:events,performance:summary,error:error.message
+ },null,2));
+ throw error;
+}finally{
  await browser?.close();
  await db.end();
  await new Promise(resolve=>server.close(resolve));
