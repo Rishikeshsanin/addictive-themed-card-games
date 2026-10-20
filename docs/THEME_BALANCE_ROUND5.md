@@ -70,6 +70,79 @@ The unchanged `study()` repeats 2P/3P/4P from every starting chooser seat under:
 - A 3,000-round cap is **only analysis censoring**, not a match draw rule. Any human-facing stall/draw policy, automatic category selection and rematch/endgame change require separate gameplay ownership and user approval.
 - The avatar/theme IP and player likeness permissions for Marvel, Ben 10, DC, Naruto, Shin-chan and Cricket are not automatically cleared by better ratings. Production remains **NO-GO** until rights, editor signoff and server/physical-device release checks.
 
-## CI results
+## Verified CI and before/after results
 
-**PENDING** — fill only from actual passing CI outputs; include separate baseline vs Round 5 pair dominance, capped rates, seat and chooser results and runtime. No PR merge or deployment.
+**PASS — both jobs at source commit `13e0f2b822d9668838ebb89a825f19d7c617e3d7`:**
+
+- [DeckVerse CI — run 39485808409](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39485808409): **142/142 Node tests passed**, zero failed; desktop/mobile recovery and existing experimental browser smoke also passed.
+- [DeckVerse Theme Packs QA — run 39485808450](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39485808450): **PASS**, real Chromium synthetic viewport smoke, including 320/390/768 px. These are *not* physical phone tests.
+- Round 4 baseline: [seeded CI run 39480301475](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39480301475) with the same 12 seeded shuffle blocks × chooser rotations × 2/3/4 seats × all seven packs × three strategies at 3,000-round censoring. These are repeatable engine calculations, **not** production multiplayer.
+
+### A. Category dominance — measured improvements in all modified universes
+
+One unordered card pair counts if one member wins at least **seven of the eight categories**. There are exactly 3,160 distinct pairs per 80-card manifest.
+
+| Theme | Before → After (50-card) | Before → After (60-card) | Before → After (80-card) | Δ 80-card |
+|---|---:|---:|---:|---:|
+| Avengers | 417 → 417 | 537 → 537 | **806 → 796** | −10 |
+| Ben 10 | 186 → 179 | 238 → 230 | **352 → 344** | −8 |
+| Shin-chan | 65 → 65 | 82 → 82 | **148 → 148** | 0 |
+| DC | 235 → 228 | 385 → 375 | **583 → 572** | −11 |
+| Naruto | 409 → 367 | 593 → 543 | **1,050 → 985** | **−65** |
+| Cricket | 271 → 269 | 357 → 354 | **544 → 539** | −5 |
+| Elemental Realms | 41 → 41 | 52 → 52 | **97 → 97** | 0 |
+| **Sum across 80-card themes** | | | **3,580 → 3,481** | **−99 (−2.77%)** |
+
+This is modest progress, **not a cure for dominant cards**. Naruto still has **985/3,160** one-sided category pairings; additional rating changes without expert interpretation would be unjustified.
+
+The original unchanged Round 4 flagging heuristic (including *hardcoded historical* editorial notes) now reports **254 HIGH / 199 MEDIUM / 107 unflagged** cards versus 258 / 197 / 105 before. Because the Round 4 note generator still contains legacy phrases about the old women’s blanket all-rounder taxonomy, **these flag counts are not an authoritative count of uncorrected factual mistakes**. The new Round 5 assertions check actual current role metadata. Do not automatically close all older editorial comments or infer that each severity change represents a fixed error.
+
+**Example targeted upper tail:** Ben 10's highest measured full-roster static category win fraction fell from **99.3% to 86.1%**, while preserving Alien X's extreme strength/energy/versatility; exact causal attribution also includes induced Rank resorting. Every theme retains Rank values 1–80, with no ties.
+
+### B. 2P/3P/4P seeded gameplay — matched baseline and current candidate
+
+Exactly **2,268** experimental local theme-engine matches per commit:
+12 independent deterministic shuffle seeds × (2+3+4 rotated chooser seats) × 7 packs × 3 choice strategies, cap 3,000, no game-engine modifications.
+
+| Strategy | Before completed | After completed | Before right-censored | After right-censored |
+|---|---:|---:|---:|---:|
+| Top-card-informed best category | 756 / 756 | **756 / 756** | 0 | **0** |
+| Uniform random category | 713 / 756 | **721 / 756** | 43 | **35** |
+| Always Rank | 752 / 756 | **752 / 756** | 4 | **4** |
+| **All** | **2,221 / 2,268** | **2,229 / 2,268** | **47** | **39** |
+
+All updated simulations show **zero detected repeated full-state cycles**. A cap is an unfinished/censored game, not proof of infinity or a need for an unapproved draw rule.
+
+| 4P random strategy: capped / 48 | Before | After |
+|---|---:|---:|
+| Avengers | 0 | 0 |
+| Ben 10 | 8 | 8 |
+| Shin-chan | 8 | 8 |
+| DC | 4 | 4 |
+| Naruto | 8 | **4** |
+| Cricket | 4 | **0** |
+| Elemental Realms | 8 | 8 |
+
+**Other censored matches:** Fantasy random 3P **3/36 both before and after**. Cricket 4P Rank-only caps improved **4 → 0**, **but Avengers 4P Rank-only regressed 0 → 4**. That is why the all-strategy cap total falls by only eight, and why this data does **not** imply a globally solved endgame. On a 3,000-round cap, some completed random games still run for nearly 3,000 rounds (e.g., Shin-chan 2P 2,961; Fantasy 4P 2,895), so continue UX review without changing gameplay rules in this PR.
+
+### C. First chooser — improvements and regressions, 12 seed clusters only
+
+The first chooser win rate uses only **fully finished starting-seat rotation seed blocks** under the best strategy. Neutral expectations: 2P 50%, 3P 33.33%, 4P 25%. These are noisy, small-sample estimates, **not proof of a fair human game**.
+
+| Theme | 2P before → after | 3P before → after | 4P before → after |
+|---|---:|---:|---:|
+| Avengers | 70.83% → **70.83%** | 47.22% → **47.22%** | 27.08% → **31.25%** |
+| Ben 10 | 58.33% → **50.00%** | 36.11% → **36.11%** | 22.92% → **20.83%** |
+| Shin-chan | 50.00% → **50.00%** | 52.78% → **52.78%** | 29.17% → **29.17%** |
+| DC | 58.33% → **54.17%** | 41.67% → **50.00%** | 35.42% → **25.00%** |
+| Naruto | 62.50% → **62.50%** | 41.67% → **22.22%** | 31.25% → **29.17%** |
+| Cricket | 45.83% → **50.00%** | 41.67% → **30.56%** | 29.17% → **39.58%** |
+| Elemental Realms | 70.83% → **70.83%** | 30.56% → **30.56%** | 31.25% → **31.25%** |
+
+**Important adverse results:** cricket 4P first-chooser advantage appears larger at 39.58%; DC 3P rises to 50%; Avengers 4P grows modestly. Reductions in aggregate card dominance do **not** guarantee a fairer match when card order and chooser selection matter. CIs from 12 independent shuffled blocks remain extremely wide, so treat these as signals for a larger 200–600+ seed retest, not grounds for changing rules or deciding that any theme has fixed bias.
+
+### D. Regression and acceptance gates
+
+The Round 5 test asserts no identity/ID/manifest drift, no category direction changes, no Rank ties, exact role/group annotations, the unchanged Dhoni traits/position, all Shin-chan scenario cards, unchanged 2/3/4 turn/capacity card conservation and expert-identified signature axes. Production DB, server theme registry, hosted physical multiplayer, franchise rights, and approval to change rules were **never part of this audit**.
+
+**Review verdict: DRAFT / NO MERGE / NO DEPLOY.** Accept or reject the targeted editorial changes individually; get subject-matter review of role/depiction assumptions, investigate the 39 censored matches and the 3P/4P chooser regressions, and obtain IP/likeness clearance before unrestricted publication.
