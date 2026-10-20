@@ -38,9 +38,9 @@ try{
   assert.equal(await page.getAttribute('body','data-theme'),'avengers');
   await geometry(page,'landing '+width);
   for(const theme of themes){
-   await page.locator('[data-theme="'+theme+'"]').click();
+   await page.locator('.theme-tile[data-theme="'+theme+'"]').click();
    assert.equal(await page.getAttribute('body','data-theme'),theme,'Theme identity must switch');
-   assert.equal(await page.locator('[data-theme="'+theme+'"]').getAttribute('aria-pressed'),'true');
+   assert.equal(await page.locator('.theme-tile[data-theme="'+theme+'"]').getAttribute('aria-pressed'),'true');
    assert.equal(await page.locator('.collection-card').count(),50);
    assert.equal(await page.locator('.theme-tile.selected').count(),1);
    assert.ok((await page.locator('.collection-card .sigil').count())>=50,'Original CSS motif must render');
@@ -51,7 +51,7 @@ try{
     await page.screenshot({path:'/tmp/deckverse-theme-lab-premium-'+theme+'-'+width+'.png'});
    }
   }
-  await page.locator('[data-theme="fantasy"]').click();
+  await page.locator('.theme-tile[data-theme="fantasy"]').click();
   await page.locator('#sort').selectOption('rank');
   const rankList=await page.locator('.rank-pill').allTextContents();
   const ranks=rankList.map(x=>Number(x.replace(/\D/g,'')));
@@ -85,7 +85,7 @@ try{
   const motion=await page.locator('.reveal').evaluate(el=>getComputedStyle(el).animationDuration);
   assert.ok(['0s','0.01ms','0.001s'].includes(motion)||parseFloat(motion)===0,'Respect reduced motion');
   await geometry(page,'filters '+width);
-  await page.locator('[data-theme="shinchan"]').click();
+  await page.locator('.theme-tile[data-theme="shinchan"]').click();
   await page.locator('#pace').selectOption('quick');
   await page.locator('#players').selectOption('4');
   await page.locator('#start').click();
