@@ -25,6 +25,7 @@ BEGIN
  WHERE conrelid='deckverse.players'::regclass AND conname='players_seat_check' AND contype='c';
  IF definition IS NULL THEN RAISE EXCEPTION '004 expected players_seat_check missing'; END IF;
  IF definition NOT LIKE '%seat = ANY (ARRAY[0, 1])%'
+    AND NOT (definition LIKE '%seat >= 0%' AND definition LIKE '%seat <= 1%')
     AND NOT (definition LIKE '%seat >= 0%' AND definition LIKE '%seat <= 3%') THEN
    RAISE EXCEPTION '004 unexpected players_seat_check: %',definition;
  END IF;
@@ -42,7 +43,8 @@ DECLARE definition text;
 BEGIN
  SELECT pg_get_constraintdef(oid) INTO definition FROM pg_constraint
  WHERE conrelid='deckverse.players'::regclass AND conname='players_seat_check' AND contype='c';
- IF definition LIKE '%seat = ANY (ARRAY[0, 1])%' THEN
+ IF definition LIKE '%seat = ANY (ARRAY[0, 1])%'
+   OR (definition LIKE '%seat >= 0%' AND definition LIKE '%seat <= 1%') THEN
    ALTER TABLE deckverse.players DROP CONSTRAINT players_seat_check;
    ALTER TABLE deckverse.players ADD CONSTRAINT players_seat_check
      CHECK (seat BETWEEN 0 AND 3) NOT VALID;
