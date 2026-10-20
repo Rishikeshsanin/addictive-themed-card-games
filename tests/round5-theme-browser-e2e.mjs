@@ -1,9 +1,9 @@
 /**
  * Round 5: REAL isolated HTTP handlers + disposable PostgreSQL 16 + independent
  * Chromium browser contexts. Eight themes x 2/3/4 people. This tests SERVER
- * contract through browser fetch, NOT Agent C's unmerged themed UI.
+ * contract through browser fetch, AND the combined Agent C themed multiplayer UI.
  *
- * The 4 viewport snapshots below are labelled BASELINE FRONTEND / PENDING C.
+ * Baseline screenshots and integrated UI-driven cases are distinctly labelled.
  * Never connect this harness to Supabase, Vercel or real LiveKit.
  */
 import assert from 'node:assert/strict';
@@ -257,6 +257,101 @@ async function scenario(theme,n,index){
    round:1,rematchMatchNumber:2,frontend:'PENDING_AGENT_C',database:'disposable postgres:16',sdk:'not loaded'});
  }finally{for(const c of users)await c.c.close().catch(()=>{});}
 }
+
+/**
+ * Combined Agent C + E acceptance. Unlike the API fetch matrix above, these
+ * checks interact with real game UI controls and their authenticated sessions.
+ * This runs ONLY with the isolated localhost Docker PostgreSQL fixture.
+ */
+async function themedUiScenario(theme,n,width){
+ await resetQuota();
+ const clients=[];
+ const identity=t=>String(t).replace(/[^a-z0-9]/gi,'');
+ try{
+  for(let i=0;i<n;i++)clients.push(await context(i===0?width:i===1?390:768));
+  const host=clients[0].p;
+  await host.locator('[data-theme-id="'+theme+'"]').first().click();
+  await host.locator('#setup:not(.hidden)').waitFor({timeout:12000});
+  assert.equal(await host.locator('[data-choose-theme="'+theme+'"]').getAttribute('aria-pressed'),'true');
+  await host.locator('[data-player-count="'+n+'"]').click();
+  await host.locator('[data-mode="remote"]').click();
+  await host.locator('#player-name').fill('UI Host '+identity(theme));
+  await host.locator('#create-room').click();
+  await host.locator('#lobby:not(.hidden)').waitFor({timeout:16000});
+  const code=(await host.locator('#room-code').textContent()).trim();
+  assert.match(code,/^[A-Z0-9]{6}$/);
+  const first=await roomRow(code);
+  assert.equal(first.theme_id,theme,'UI must create requested theme in server-owned room');
+  assert.equal(first.player_count,n);
+  const guestSessions=[];
+  for(let i=1;i<n;i++){
+   const guest=clients[i].p;
+   await guest.locator('#top-play').click();
+   await guest.locator('#setup:not(.hidden)').waitFor();
+   const decoy=theme==='pokemon'?'avengers':'pokemon';
+   await guest.locator('[data-choose-theme="'+decoy+'"]').click();
+   await guest.locator('#player-name').fill('UI Guest '+i+' '+identity(theme));
+   await guest.locator('#join-code').fill(code);
+   await guest.locator('#join-room').click();
+   await guest.locator('#lobby:not(.hidden)').waitFor({timeout:16000});
+   assert.ok((await guest.locator('#lobby-theme').textContent()).length>2);
+   assert.equal(await guest.evaluate(()=>document.body.dataset.onlineTheme),theme,
+    'Joining must follow the persisted host theme, never the guest selector');
+   const guestSession=await guest.evaluate(()=>JSON.parse(sessionStorage.getItem('deckverse_session')));
+   assert.ok(guestSession?.token,'Guest must retain authenticated private session');
+   guestSessions.push(guestSession);
+   await guest.locator('#toggle-ready').click();
+  }
+  await host.waitForFunction(()=>{
+   const button=document.querySelector('#start-match');
+   return button&&!button.disabled&&!button.classList.contains('hidden');
+  },{timeout:20000});
+  await host.locator('#start-match').click();
+  for(const client of clients)await client.p.locator('#battle:not(.hidden)').waitFor({timeout:18000});
+  const started=await roomRow(code);
+  assert.equal(started.status,'playing');
+  assert.equal(started.theme_id,theme);
+  assert.equal(started.state.players.length,n);
+  const cats=(await fromBrowser(host,'get',{
+   code,token:(await host.evaluate(()=>JSON.parse(sessionStorage.getItem('deckverse_session')))).token
+  })).data.room.theme.categories;
+  assert.equal(cats.length,8);
+  for(const client of clients){
+   const page=client.p;
+   assert.equal(await page.locator('#stat-buttons button').count(),8,'Eight theme-specific UI action buttons');
+   assert.deepEqual((await page.locator('#stat-buttons button').evaluateAll(buttons=>buttons.map(b=>b.dataset.stat))).sort(),
+    cats.map(s=>s.key).sort(),'Stats must match the server-approved selected theme');
+   assert.equal(await page.evaluate(()=>document.body.dataset.onlineTheme),theme);
+   if(theme!=='pokemon'){
+    const hidden=n===2?page.locator('#their-card .theme-facedown'):page.locator('#multi-arena .theme-facedown');
+    assert.ok(await hidden.count()>=1,'Opponent future card must remain concealed in the DOM');
+   }
+   await uiGeometry(page,(await page.evaluate(()=>innerWidth)),'integrated-theme-ui', {allowHidden:false});
+   assert.deepEqual(client.errors,[],'Integrated UI page exception '+theme+'/'+n);
+  }
+  const chooser=started.state.chooser;
+  await clients[chooser].p.waitForFunction(()=>{
+   return document.querySelectorAll('#stat-buttons button:not([disabled])').length===8;
+  },{timeout:14000});
+  await clients[chooser].p.locator('#stat-buttons button:not([disabled])').first().click();
+  await clients[chooser].p.locator('#result.compact').waitFor({timeout:13000});
+  const advanced=await roomRow(code);
+  assert.equal(advanced.state.round,1,'Actual UI click must advance persisted room exactly one round');
+  assert.equal(advanced.theme_id,theme);
+  if(theme!=='pokemon'){
+   const revealed=n===2?clients[chooser].p.locator('#their-card .theme-card-name'):
+    clients[chooser].p.locator('#multi-arena .theme-card-name');
+   assert.ok(await revealed.count()>=1,'Theme character name visible after round reveal');
+  }
+  if(width===320||width===1366)
+   await clients[chooser].p.screenshot({
+    path:'/tmp/deckverse-round5-integrated-'+theme+'-'+n+'-'+width+'.png',fullPage:true,timeout:14000
+   });
+  record('INTEGRATED THEMED UI','PASS',{theme,n,width,realSelection:true,realJoin:true,
+   eightServerCategories:true,privateHiddenCards:true,realTurn:true,database:'disposable'});
+ }finally{for(const client of clients)await client.c.close().catch(()=>{});}
+}
+
 try{
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/google-chrome',
@@ -266,10 +361,17 @@ try{
   for(const n of [2,3,4])await scenario(theme,n,i);
  }
  assert.equal(events.filter(e=>e.name==='API browser matrix'&&e.status==='PASS').length,24);
+ // Every requested franchise gets its actual UI smoke; 3P/4P covered in
+ // representative real UI sessions, while API/SQL covers all 24 combinations.
+ for(let i=0;i<ALLOWED_THEME_IDS.length;i++)
+  await themedUiScenario(ALLOWED_THEME_IDS[i],2,[320,390,768,1366][i%4]);
+ for(const t of ['avengers','fantasy'])for(const n of [3,4])
+  await themedUiScenario(t,n,n===3?390:768);
+ assert.equal(events.filter(e=>e.name==='INTEGRATED THEMED UI'&&e.status==='PASS').length,12);
  const report={classification:'real localhost HTTP -> real game.js -> disposable PostgreSQL 16, independently managed Chromium',
-  frontendAgentC:'PENDING (not in this base)',physicalDevices:'NOT TESTED',
+  frontendAgentC:'12 UI-driven cases executed on this combined branch',physicalDevices:'NOT TESTED',
   liveKitCloud:'NOT TESTED',matchCompletion:'synthetic terminal state for rematch',
   passedMatrix:24,totalMatrix:24,events,metrics,defects};
  await writeFile('/tmp/deckverse-round5-report.json',JSON.stringify(report,null,2));
- console.log('ROUND5_FINAL_API_MATRIX_PASS 8 themes × 2/3/4 players, 24 separate sessions groups. FRONTEND_AGENT_C=PENDING');
+ console.log('ROUND5_FINAL_API_MATRIX_PASS 24 API scenarios + 12 UI-driven cases across eight themes');
 }finally{await browser?.close();await new Promise(done=>server.close(done));await db.end();}
