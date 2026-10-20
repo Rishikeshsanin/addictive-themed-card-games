@@ -10,6 +10,7 @@ on:
       - 'api/game.js'
       - 'src/presence.js'
       - '.github/workflows/db-presence-check.yml'
+      - 'docs/V2_CI_PARITY_REVIEW.md'
   workflow_dispatch:
 
 permissions:
