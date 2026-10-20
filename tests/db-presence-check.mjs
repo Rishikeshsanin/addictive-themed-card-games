@@ -314,6 +314,44 @@ test('abandonment predicate after long inactivity is not an implemented cleanup 
   // No deletion/expiration is performed by the policy evaluator or read-only GET.
   assert.equal((await details(r.code)).r.status,'lobby');
 });
+test('simultaneous competing old/new host settings serialize to one authority',async()=>{
+  const r=await room();
+  await stale(r.code,0,121);
+  const actions=await Promise.all([
+    request('settings',as(r.users[0],{mode:'auto',seconds:3})),
+    request('settings',as(r.users[1],{mode:'auto',seconds:5}))
+  ]);
+  assert.deepEqual(actions.map(x=>x.status).sort(),[200,403]);
+  const committed=await details(r.code);
+  const winner=actions.findIndex(x=>x.status===200);
+  assert.equal(committed.r.host_seat,winner);
+  assert.ok(Number(committed.r.presence_version)<=1);
+});
+test('simultaneous heartbeat and intentional leave cannot resurrect a departed seat',async()=>{
+  const r=await room();
+  const actions=await Promise.all([
+    request('leave',as(r.users[0])),
+    request('heartbeat',as(r.users[0]))
+  ]);
+  assert.equal(actions[0].status,200);
+  assert.ok([200,401].includes(actions[1].status));
+  const committed=await details(r.code);
+  assert.equal(committed.players[0].active,false);
+  assert.ok(committed.players[0].left_at instanceof Date);
+  await rejected('heartbeat',as(r.users[0]),401);
+});
+test('three-hour sliding expiry contradicts 24-hour playing abandonment horizon',async()=>{
+  const r=await room();
+  await readyAndStart(r.users);
+  await ok('heartbeat',as(r.users[0]));
+  const state=await details(r.code);
+  const inFourHours=Date.now()+4*60*60_000;
+  const preservedPolicy=evaluateRoomPresence({
+    players:state.players,playerCount:2,hostSeat:0,status:'playing',now:inFourHours
+  });
+  assert.equal(preservedPolicy.abandoned,false); // intended policy still preserves cards
+  assert.ok(state.r.expires_at.getTime()<inFourHours); // API would reject before 24h
+});
 test.after(async()=>{
   await app.end({timeout:2});
   await db.end({timeout:2});
