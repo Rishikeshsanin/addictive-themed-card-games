@@ -15,17 +15,17 @@ async function check(){
  assert.equal(body.status,'ready','Server DB must be connected');
 }
 async function run(){
- const totalStart=now();let host=null,guest=null,code=null;
+ const totalStart=now();let host=null,guest=null,code=null,hostToken=null,guestToken=null;
  const metrics={};
  try{
   await check();
-  const st=now();host=await call('create',{name:'QA Host',mode:'same'});metrics.createMs=Math.round(now()-st);code=host.room.code;
+  const st=now();host=await call('create',{name:'QA Host',mode:'same'});metrics.createMs=Math.round(now()-st);code=host.room.code;hostToken=host.token;
   assert.match(code,/^[A-Z0-9]{6}$/);
   assert.equal(host.room.revealSettings.mode,'auto');assert.equal(host.room.revealSettings.seconds,2);
   let hostAuth={code,token:host.token};
   let updated=await call('settings',{...hostAuth,mode:'manual',seconds:2});
   assert.equal(updated.room.revealSettings.mode,'manual');
-  const joined=now();guest=await call('join',{name:'QA Guest',mode:'same',code});metrics.joinMs=Math.round(now()-joined);
+  const joined=now();guest=await call('join',{name:'QA Guest',mode:'same',code});metrics.joinMs=Math.round(now()-joined);guestToken=guest.token;
   assert.equal(guest.players.length,2);
   assert.equal(guest.room.revealSettings.mode,'manual');
   const guestAuth={code,token:guest.token};
@@ -38,7 +38,7 @@ async function run(){
   guest=await call('get',guestAuth);
   assert.equal(guest.game.topCard.id!==host.game.topCard.id,true);
   assert.equal(host.game.players,undefined);
-  const chooser=host.game.chooser,token=chooser===0?host.token:guest.token;
+  const chooser=host.game.chooser,token=chooser===0?hostAuth.token:guestAuth.token;
   const next=await call('select',{code,token,stat:'rank',expectedRound:0});
   assert.equal(next.game.round,1);
   assert.equal(next.game.reveal.mode,'manual');
@@ -49,7 +49,7 @@ async function run(){
   assert.equal(other.game.reveal.active,true);
   assert.equal(other.game.last.values.length,2);
   const newChooser=next.game.chooser;
-  const newToken=newChooser===0?host.token:guest.token;
+  const newToken=newChooser===0?hostAuth.token:guestAuth.token;
   try{await call('select',{code,token:newToken,stat:'rank',expectedRound:1});assert.fail('Early round selection should be blocked')}
   catch(e){assert.equal(e.status,409)}
   await call('ack', {...hostAuth,expectedRound:1});
@@ -60,7 +60,7 @@ async function run(){
   metrics.totalMs=Math.round(now()-totalStart);
   console.log('PASS: remote 2-player create/join/ready, host settings, concealed decks, both-card reveal, blocked early turn, two-ack manual confirmation, second round; '+JSON.stringify(metrics));
  }finally{
-  if(code){for(const s of [guest,host]){if(!s?.token)continue;try{await call('leave',{code,token:s.token})}catch{}}}
+  if(code){for(const token of [guestToken,hostToken]){if(!token)continue;try{await call('leave',{code,token})}catch{}}}
  }
 }
 await run();
