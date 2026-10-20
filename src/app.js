@@ -168,9 +168,65 @@ function queueRevealRefresh(){
   revealTimer=setTimeout(()=>{renderKey='';renderBattle()},ms);
  }
 }
+function showMultiRoundResult(last,me){
+ if(!last?.cards?.length)return;
+ const winner=last.winner;
+ const tie=last.kind==='tie';
+ const ownWin=winner===me;
+ const title=tie?'THE CARDS GO TO THE JACKPOT':ownWin?'YOU WON THE ROUND!':winner===null?'ROUND RESOLVED':escapeHtml(playerName(winner))+' WINS THE ROUND!';
+ const rows=last.cards.map((played,i)=>{
+  const character=card(played.id);
+  return '<span>'+escapeHtml(playerName(played.seat))+' · '+escapeHtml(character?.name||'CARD')+' <b>'+Number(last.values[i]).toLocaleString(undefined,{maximumFractionDigits:2})+'</b></span>';
+ }).join('');
+ const manual=game.reveal?.mode==='manual',acked=game.reveal?.acks?.includes(me);
+ $('result').className='result-pop compact '+(tie?'tie':ownWin?'win':'loss');
+ $('result').innerHTML='<div class="reveal-summary"><h3>'+title+'</h3><p>'+escapeHtml(last.stat.toUpperCase())+' · '+(tie?'All played cards are held aside.':'Cards move to the winning deck.')+'</p><div class="multi-result-values">'+rows+'</div></div><div class="reveal-action">'+(manual?'<button id="round-continue" class="btn btn-primary" '+(acked?'disabled':'')+'>'+(acked?'✓ READY':'CONTINUE →')+'</button>':'<span class="reveal-countdown">NEXT ROUND IN '+Math.max(0,Math.ceil((Date.parse(game.reveal.until)-Date.now())/1000))+'s</span>')+'</div>';
+ $('result').classList.remove('hidden');
+ if(manual&&!acked)$('round-continue').onclick=async()=>{
+  const button=$('round-continue');button.disabled=true;button.textContent='CONFIRMING…';
+  if(!(await roomAction('ack',{expectedRound:game.round}))){button.disabled=false;button.textContent='CONTINUE →'}
+ };
+}
+function renderMultiBattle(){
+ const count=game.playerCount,me=game.me,ended=game.status==='finished'||game.status==='aborted',active=revealing(),last=game.last;
+ const signature=['multi',game.matchNumber||1,game.round,game.status,game.chooser,game.counts.join(','),game.pot,active,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
+ if(renderKey===signature)return;
+ renderKey=signature;
+ document.querySelector('#battle .battle-meta').classList.add('hidden');
+ document.querySelector('#battle .tabletop').classList.add('hidden');
+ $('multi-arena').classList.remove('hidden');
+ $('round-number').textContent=String(game.round+(active||ended?0:1)).padStart(2,'0');
+ $('multi-arena').innerHTML=Array.from({length:count},(_,seat)=>{
+  const played=active?last?.cards?.find(x=>x.seat===seat):null;
+  const character=played?card(played.id):seat===me?game.topCard:null;
+  const outOfCards=game.counts[seat]===0&&!played;
+  return '<div class="multi-player '+(seat===me?'mine':'')+'"><div class="multi-player-heading"><span>'+escapeHtml(playerName(seat))+(seat===me?' (YOU)':'')+'</span><small>'+game.counts[seat]+' CARDS'+(outOfCards?' · OUT':'')+'</small></div><div class="battle-card multi-card">'+pokemonCard(character,active&&played?last.stat:'')+'</div></div>';
+ }).join('');
+ const canPlay=!active&&!ended&&game.chooser===me&&Boolean(game.topCard)&&!actionBusy&&networkState==='connected';
+ $('battle-status').textContent=active?'ROUND CARDS REVEALED':ended?'MATCH FINISHED':canPlay?'YOUR TURN TO CHOOSE':'WAITING FOR THE CATEGORY';
+ $('turn-power').textContent=active?'✦ REVIEW THE ROUND':ended?'✦ FINAL RESULT':game.chooser===me?'✦ YOU HAVE THE POWER':'⌛ '+playerName(game.chooser).toUpperCase()+' IS CHOOSING';
+ $('controls-title').textContent=ended?'THE SHOWDOWN IS OVER.':active?'EVERY PLAYER SEES THE SAME CARDS.':game.chooser===me?'PICK YOUR WINNING STAT.':'WAIT FOR THE CATEGORY CALL.';
+ $('control-subtitle').textContent=active?'The next turn unlocks after the shared reveal.':ended?'See the result above.':'Rank is the only category where lower wins.';
+ $('stat-buttons').innerHTML=STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(game.topCard?Number(game.topCard[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
+ $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>play(b.dataset.stat));
+ $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
+ $('call-dock').classList.toggle('hidden',session?.mode!=='remote');
+ const host=session?.me.index===0;
+ $('battle-settings-open').classList.toggle('hidden',!host||ended);
+ if(!host||ended)$('battle-settings-panel').classList.add('hidden');
+ const settings=lobbySnapshot?.room?.revealSettings||{mode:'auto',seconds:2};
+ if(document.activeElement!==$('battle-reveal-setting'))$('battle-reveal-setting').value=settings.mode+'-'+settings.seconds;
+ if(active)showMultiRoundResult(last,me);
+ else if(ended)showFinalResult(me);
+ else $('result').classList.add('hidden');
+ queueRevealRefresh();
+}
 function renderBattle(){
  if(!game)return;
  if(!practice&&game.playerCount>2){renderMultiBattle();return;}
+ document.querySelector('#battle .battle-meta').classList.remove('hidden');
+ document.querySelector('#battle .tabletop').classList.remove('hidden');
+ $('multi-arena').classList.add('hidden');
  const me=practice?0:game.me,enemy=1-me,own=game.topCard;
  const active=revealing(),ended=game.status==='finished';
  const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
@@ -242,7 +298,7 @@ function showRoundResult(last,me){
  if(manual&&!acked){$('round-continue').onclick=async()=>{const b=$('round-continue');b.disabled=true;b.textContent='CONFIRMING…';const ok=await roomAction('ack',{expectedRound:game.round});if(!ok){b.disabled=false;b.textContent='CONTINUE →'}}}
 }
 async function play(key){
- if(game?.status!=='playing'||game.chooser!==(practice?0:game.me)||revealing()||actionBusy)return;
+ if(game?.status!=='playing'||game.chooser!==(practice?0:game.me)||revealing()||actionBusy||(!practice&&networkState!=='connected'))return;
  document.querySelectorAll('[data-stat]').forEach(b=>b.disabled=true);
  if(practice){
   try{practice=takeTurn(practice,0,key);game={...viewFor(practice,0),me:0,practice:true,reveal:{mode:'auto',seconds:2,acks:[],until:new Date(Date.now()+2000).toISOString()}};renderKey='';renderBattle();scheduleBot()}catch(e){toast(e.message)}
