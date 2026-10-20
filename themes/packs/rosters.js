@@ -777,3 +777,37 @@ export const PACK_ROSTERS = {
     }
   ]
 };
+
+
+// Round 5 specialist annotations. These change role/group metadata used by
+// draft game-rating templates, not identity, deck IDs, ordering or game rules.
+// Gameplay scores are subjective and MUST NOT be represented as career statistics.
+// Women’s Cricket remains the collection group; each athlete gets her playing role.
+export const PACK_ENTRY_OVERRIDES=Object.freeze({
+  cricket:Object.freeze({
+    'Yuvraj Singh':{role:'allround'},
+    'Glenn Maxwell':{role:'allround'},
+    'Jacques Kallis':{role:'allround'},
+    'Sanath Jayasuriya':{role:'allround'},
+    'Adam Gilchrist':{role:'keeper_bat'},
+    'Jos Buttler':{role:'keeper_bat'},
+    'Kumar Sangakkara':{role:'keeper_bat'},
+    'Mithali Raj':{role:'bat'},
+    'Jhulan Goswami':{role:'bowl'},
+    'Smriti Mandhana':{role:'bat'},
+    'Shafali Verma':{role:'bat'},
+    'Richa Ghosh':{role:'keeper_bat'},
+    'Meg Lanning':{role:'bat'},
+    'Alyssa Healy':{role:'keeper_bat'},
+    'Beth Mooney':{role:'bat'},
+    'Sophie Ecclestone':{role:'bowl'},
+    'Laura Wolvaardt':{role:'bat'}
+  }),
+  naruto:Object.freeze({
+    'Shukaku':{role:'tailed_beast',group:'Tailed Beasts'},
+    'Kurama':{role:'tailed_beast',group:'Tailed Beasts'},
+    'Gyuki':{role:'tailed_beast',group:'Tailed Beasts'},
+    'Hagoromo Otsutsuki':{role:'sage',group:'Otsutsuki Ancestors'},
+    'Hamura Otsutsuki':{role:'sage',group:'Otsutsuki Ancestors'}
+  })
+});
