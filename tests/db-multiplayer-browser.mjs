@@ -118,7 +118,14 @@ try{
    }
    assert.equal((await gameRow(code)).state.round,1);
    await pages[n-1].locator('#round-continue').click();
-   const acknowledgements=await sql`select reveal_acks from deckverse.rooms where code=${code}`;
+   // The click can return while fetch()/SQL is still committing. Await persistence,
+   // not the optimistic disabled state of the acknowledgement button.
+   let acknowledgements=[];
+   for(let attempt=0;attempt<100;attempt++){
+    acknowledgements=await sql`select reveal_acks from deckverse.rooms where code=${code}`;
+    if(acknowledgements[0].reveal_acks.length===n)break;
+    await new Promise(resolve=>setTimeout(resolve,50));
+   }
    assert.deepEqual([...acknowledgements[0].reveal_acks].sort(),Array.from({length:n},(_,i)=>i));
    await pages[0].screenshot({path:'/tmp/deckverse-db-multiplayer-'+n+'p-320.png',fullPage:true});
    await pages[0].reload({waitUntil:'domcontentloaded'});
