@@ -7,6 +7,73 @@ let pollBusy=false,actionBusy=false,readyBusy=false,pollTimer=null,revealTimer=n
 let pollEpoch=0,pollDelay=0,networkState='connected',heartbeatTimer=null,heartbeatBusy=false;
 function networkStatus(state){if(networkState===state)return;networkState=state;const box=$('network-status');if(!box)return;box.classList.toggle('hidden',state==='connected');box.textContent=state==='offline'?'OFFLINE · Your room is preserved. Reconnect to continue.':'RECONNECTING · Your cards and room remain safe.';renderKey='';if(screen==='battle'&&game)renderBattle();}
 const symbols={rank:'♛',height:'↕',weight:'◆',attack:'⚔',defense:'⬡',speed:'⚡',energy:'✧',hp:'♥'};
+
+const THEME_LOOKS=Object.freeze({
+ pokemon:{name:'POKÉMON',symbol:'⚡'},avengers:{name:'AVENGERS SAGA',symbol:'✦'},
+ ben10:{name:'BEN 10 ALIEN CLASH',symbol:'◎'},shinchan:{name:'SHIN-CHAN CHAOS',symbol:'✿'},
+ dc:{name:'DC LEGENDS',symbol:'◆'},naruto:{name:'NARUTO SHINOBI CLASH',symbol:'◈'},
+ cricket:{name:'CRICKET LEGENDS',symbol:'★'},fantasy:{name:'ELEMENTAL REALMS',symbol:'✧'}
+});
+let selectedThemeId='pokemon';
+const themeLook=id=>THEME_LOOKS[id]||THEME_LOOKS.pokemon;
+const activeThemeId=()=>practice?'pokemon':lobbySnapshot?.room?.themeId||'pokemon';
+const activeCategories=()=>practice?STAT_FIELDS:lobbySnapshot?.room?.theme?.categories||STAT_FIELDS;
+const numericDisplay=n=>n===null||n===undefined||!Number.isFinite(Number(n))?'—':
+ Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
+function chooseSetupTheme(id){
+ if(!Object.prototype.hasOwnProperty.call(THEME_LOOKS,id))return;
+ selectedThemeId=id;
+ document.querySelectorAll('[data-choose-theme]').forEach(el=>{
+  const picked=el.dataset.chooseTheme===id;
+  el.classList.toggle('selected',picked);el.setAttribute('aria-pressed',String(picked));
+ });
+ $('selected-theme-note').textContent='Creating a '+themeLook(id).name+
+  ' private room. Guests automatically use the host\'s theme.';
+}
+function themeCard(c,chosen='',reveal=null){
+ const id=activeThemeId(),look=themeLook(id);
+ if(!c)return '<div class="theme-battle-card theme-facedown" data-theme-id="'+escapeHtml(id)+
+  '" aria-label="Opponent card concealed"><div class="theme-card-top"><span>DECKVERSE</span><span>HIDDEN</span></div>'+
+  '<div class="theme-portrait theme-back-portrait" aria-hidden="true"><span>✦</span></div>'+
+  '<div class="theme-card-name">FACE DOWN</div><div class="theme-revealed-note">Only the owner can see this card.</div></div>';
+ const cards=activeCategories();
+ const hasStats=Boolean(c.stats&&typeof c.stats==='object');
+ const shown=hasStats?cards:reveal?cards.filter(stat=>stat.key===reveal.key):[];
+ const glyph=String(c.name||'?').trim().slice(0,1).toUpperCase();
+ const statRows=shown.map(cat=>{
+  const value=hasStats?c.stats[cat.key]:reveal.value;
+  return '<div class="theme-card-stat '+(cat.key===chosen?'best':'')+'"><span>'+
+   (cat.direction==='min'?'↓ ':'')+escapeHtml(cat.name||cat.key)+'</span><strong>'+
+   numericDisplay(value)+'</strong></div>';
+ }).join('');
+ return '<div class="theme-battle-card" data-theme-id="'+escapeHtml(id)+'"><div class="theme-card-top"><span>NO. '+
+  String(Number(c.id)||0).padStart(3,'0')+'</span><span>'+escapeHtml(look.name)+'</span></div>'+
+  '<div class="theme-portrait" aria-hidden="true"><span>'+escapeHtml(glyph)+'</span></div>'+
+  '<div class="theme-card-name">'+escapeHtml(c.name||'CARD')+'</div>'+
+  (!hasStats&&reveal?'<div class="theme-revealed-note">Revealed · '+escapeHtml(reveal.key.toUpperCase())+'</div>':'')+
+  '<div class="theme-card-stats">'+statRows+'</div></div>';
+}
+function visibleCard(c,chosen='',reveal=null){
+ return activeThemeId()==='pokemon'?pokemonCard(c,chosen):themeCard(c,chosen,reveal);
+}
+function themeControlMarkup(canPlay,own){
+ return activeCategories().map(cat=>{
+  const value=activeThemeId()==='pokemon'?own?.[cat.key]:own?.stats?.[cat.key];
+  const label=escapeHtml(cat.name||cat.key);
+  return '<button class="stat-button" data-stat="'+escapeHtml(cat.key)+
+   '" aria-label="'+label+(cat.direction==='min'?' · lower wins':' · higher wins')+
+   '" '+(!canPlay?'disabled':'')+'><span>'+(symbols[cat.key]||'✦')+' '+label+
+   (cat.direction==='min'?' ↓':'')+'</span><b>'+numericDisplay(value)+'</b></button>';
+ }).join('');
+}
+function updateThemeChrome(){
+ const id=activeThemeId(),look=themeLook(id);
+ document.body.dataset.onlineTheme=id;
+ $('battle-theme-title').textContent=' / '+(id==='pokemon'?'CLASSIC DUEL':look.name);
+ $('my-card-label').textContent=id==='pokemon'?'YOUR POKÉMON':'YOUR '+look.name+' CARD';
+ $('their-card-label').textContent=id==='pokemon'?"RIVAL'S POKÉMON":"RIVAL'S CARD";
+}
+
 const elements=['landing','setup','lobby','battle'];
 function show(id){screen=id;for(const el of elements)$(el).classList.toggle('hidden',el!==id);if(id!=='landing')window.scrollTo(0,0);if(id==='landing')location.hash='';if(id==='setup')checkRoomHealth();}
 let toastTimer;
@@ -38,7 +105,13 @@ function init(){
  window.addEventListener('offline',()=>{if(session)networkStatus('offline')});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session)beginPolling()});
  $('player-name').value=localStorage.getItem('deckverse_name')||'';
- for(const b of ['top-play','hero-play','pokemon-tile'])$(b).addEventListener('click',setupScreen);
+ for(const b of ['top-play','hero-play'])$(b).addEventListener('click',setupScreen);
+  document.querySelectorAll('[data-theme-id]').forEach(button=>button.addEventListener('click',()=>{
+   chooseSetupTheme(button.dataset.themeId);setupScreen();
+  }));
+  document.querySelectorAll('[data-choose-theme]').forEach(button=>button.addEventListener('click',()=>{
+   chooseSetupTheme(button.dataset.chooseTheme);
+  }));
  $('hero-how').addEventListener('click',()=>document.querySelector('#how').scrollIntoView({behavior:'smooth'}));
  $('setup-back').addEventListener('click',()=>show('landing'));
  document.querySelectorAll('.mode-card').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('.mode-card').forEach(n=>n.classList.toggle('selected',n===b))}));
@@ -72,10 +145,13 @@ function init(){
  const room=new URLSearchParams(location.search).get('room');if(room&&/^[a-z0-9]{6}$/i.test(room)){$('join-code').value=room.toUpperCase();mode='remote';document.querySelector('[data-mode="remote"]').click();show('setup');toast('YOU HAVE AN INVITE — ENTER YOUR NAME TO JOIN')}
  try{const saved=JSON.parse(sessionStorage.getItem('deckverse_session')||'null');if(saved?.code&&saved?.token){session=saved;beginPolling();}}catch{}
 }
-function startPractice(){saveName();stopPolling();resetReveal();disconnectCall();callHealthChecked=false;session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
+function startPractice(){document.body.dataset.onlineTheme='pokemon';saveName();stopPolling();resetReveal();disconnectCall();callHealthChecked=false;session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
 const API='/api/game';
 async function api(action,body={}){let response;try{response=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})})}catch{throw Error('Cannot connect to the game server. Check your internet connection.')};const data=await response.json().catch(()=>({error:'Unexpected server response'}));if(!response.ok||data.error)throw Error(data.error||'Room request failed');return data}
-async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code,playerCount:roomSize});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
+async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{
+  const payload=action==='create'?{name,mode,playerCount:roomSize,themeId:selectedThemeId}:{name,code};
+  const data=await api(action,payload);
+  session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me,themeId:data.room.themeId||'pokemon'};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
 async function roomAction(action,params={}){
  if(!session||actionBusy)return false;
  actionBusy=true;
@@ -96,9 +172,13 @@ async function toggleReady(){
 }
 function updateRoom(data){
  if(!session||data.error)return;
+ const previousTheme=lobbySnapshot?.room?.themeId;
  session.me=data.me;session.mode=data.room.mode;session.players=data.players;
+ session.themeId=data.room.themeId||'pokemon';
  game=data.game||null;
  lobbySnapshot=data;
+ if(previousTheme!==session.themeId)renderKey='';
+ document.body.dataset.onlineTheme=session.themeId;
  sessionStorage.setItem('deckverse_session',JSON.stringify({code:session.code,token:session.token,mode:session.mode,me:session.me}));
  if(data.room.status==='lobby'){if(screen!=='lobby')show('lobby');renderLobby(data);return}
  if(data.room.status==='playing'||data.room.status==='finished'){
@@ -109,6 +189,7 @@ function updateRoom(data){
 function renderLobby(data){
  if(!data?.room||!session)return;
  $('room-code').textContent=data.room.code;
+ $('lobby-theme').textContent=themeLook(data.room.themeId||'pokemon').symbol+' '+(data.room.theme?.name||themeLook(data.room.themeId).name)+' · '+(data.room.playerCount||2)+' PLAYERS';
  const people=data.players||[],count=data.room.playerCount||2;
  $('lobby-players').innerHTML=Array.from({length:count},(_,i)=>i).map(i=>{const p=people.find(x=>x.index===i);return '<div class="player-slot"><span>'+(p?(i===0?'⚡':'🔥'):'◇')+'</span><strong>'+escapeHtml(p?.name||'WAITING FOR RIVAL')+'</strong><small>'+(p?(p.ready?'● READY':'○ NOT READY'):'INVITE SOMEONE TO JOIN')+'</small></div>'}).join('');
  $('lobby-message').textContent=people.length<count?'Share the invite link: '+people.length+'/'+count+' players joined.':people.every(x=>x.ready)?'Everyone is ready. Let the battle begin!':'Waiting for all players to get ready…';
@@ -200,7 +281,7 @@ function showMultiRoundResult(last,me){
  const title=tie?'THE CARDS GO TO THE JACKPOT':ownWin?'YOU WON THE ROUND!':winner===null?'ROUND RESOLVED':escapeHtml(playerName(winner))+' WINS THE ROUND!';
  const detail=tie?'All played cards are held aside.':last.kind==='sudden-death'?'Rank settled the exhausted-deck tie.':last.kind==='last-standing'?'Only one player had cards left after the tie.':'Cards move to the winning deck.';
  const rows=last.cards.map((played,i)=>{
-  const character=card(played.id);
+  const character=activeThemeId()==='pokemon'?card(played.id):played;
   return '<span>'+escapeHtml(playerName(played.seat))+' · '+escapeHtml(character?.name||'CARD')+' <b>'+Number(last.values[i]).toLocaleString(undefined,{maximumFractionDigits:2})+'</b></span>';
  }).join('');
  const manual=game.reveal?.mode==='manual',acked=game.reveal?.acks?.includes(me);
@@ -214,7 +295,8 @@ function showMultiRoundResult(last,me){
 }
 function renderMultiBattle(){
  const count=game.playerCount,me=game.me,ended=game.status==='finished'||game.status==='aborted',active=revealing(),last=game.last;
- const signature=['multi',lobbySnapshot?.room?.paused||false,lobbySnapshot?.room?.hostSeat??0,game.matchNumber||1,game.round,game.status,game.chooser,game.counts.join(','),game.pot,active,(game.rematchVotes||[]).join(','),game.last?.kind||'',game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
+ updateThemeChrome();
+ const signature=['multi',activeThemeId(),lobbySnapshot?.room?.paused||false,lobbySnapshot?.room?.hostSeat??0,game.matchNumber||1,game.round,game.status,game.chooser,game.counts.join(','),game.pot,active,(game.rematchVotes||[]).join(','),game.last?.kind||'',game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
  if(renderKey===signature)return;
  renderKey=signature;
  document.querySelector('#battle .battle-meta').classList.add('hidden');
@@ -223,9 +305,11 @@ function renderMultiBattle(){
  $('round-number').textContent=String(game.round+(active||ended?0:1)).padStart(2,'0');
  $('multi-arena').innerHTML=Array.from({length:count},(_,seat)=>{
   const played=active?last?.cards?.find(x=>x.seat===seat):null;
-  const character=played?card(played.id):seat===me?game.topCard:null;
+  const character=played?(activeThemeId()==='pokemon'?card(played.id):played):seat===me?game.topCard:null;
+  const revealedIndex=played?last.cards.findIndex(item=>item.seat===seat):-1;
+  const value=revealedIndex>=0?last.values?.[revealedIndex]:undefined;
   const outOfCards=game.counts[seat]===0&&!played;
-  return '<div class="multi-player '+(seat===me?'mine':'')+'"><div class="multi-player-heading"><span>'+escapeHtml(playerName(seat))+(seat===me?' (YOU)':'')+'</span><small>'+game.counts[seat]+' CARDS'+(outOfCards?' · OUT':'')+'</small></div><div class="battle-card multi-card">'+pokemonCard(character,active&&played?last.stat:'')+'</div></div>';
+  return '<div class="multi-player '+(seat===me?'mine':'')+'"><div class="multi-player-heading"><span>'+escapeHtml(playerName(seat))+(seat===me?' (YOU)':'')+'</span><small>'+game.counts[seat]+' CARDS'+(outOfCards?' · OUT':'')+'</small></div><div class="battle-card multi-card">'+visibleCard(character,active&&played?last.stat:'',played?{key:last.stat,value}:null)+'</div></div>';
  }).join('');
  const paused=Boolean(lobbySnapshot?.room?.paused);
  const canPlay=!active&&!ended&&!paused&&game.chooser===me&&Boolean(game.topCard)&&!actionBusy&&networkState==='connected';
@@ -233,7 +317,7 @@ function renderMultiBattle(){
  $('turn-power').textContent=active?'✦ REVIEW THE ROUND':ended?'✦ FINAL RESULT':game.chooser===me?'✦ YOU HAVE THE POWER':'⌛ '+playerName(game.chooser).toUpperCase()+' IS CHOOSING';
  $('controls-title').textContent=ended?'THE SHOWDOWN IS OVER.':active?'EVERY PLAYER SEES THE SAME CARDS.':game.chooser===me?'PICK YOUR WINNING STAT.':'WAIT FOR THE CATEGORY CALL.';
  $('control-subtitle').textContent=active?'The next turn unlocks after the shared reveal.':ended?'See the result above.':'Rank is the only category where lower wins.';
- $('stat-buttons').innerHTML=STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(game.topCard?Number(game.topCard[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
+ $('stat-buttons').innerHTML=activeThemeId()==='pokemon'?STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(game.topCard?Number(game.topCard[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join(''):themeControlMarkup(canPlay,game.topCard);
  $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>play(b.dataset.stat));
  $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
  $('call-dock').classList.toggle('hidden',session?.mode!=='remote');
@@ -256,25 +340,26 @@ function renderBattle(){
  $('multi-arena').classList.add('hidden');
  const me=practice?0:game.me,enemy=1-me,own=game.topCard;
  const active=revealing(),ended=game.status==='finished';
- const signature=[lobbySnapshot?.room?.paused||false,lobbySnapshot?.room?.hostSeat??0,game.matchNumber||1,game.round,active,ended,(game.rematchVotes||[]).join(','),game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
+ updateThemeChrome();
+ const signature=[activeThemeId(),lobbySnapshot?.room?.paused||false,lobbySnapshot?.room?.hostSeat??0,game.matchNumber||1,game.round,active,ended,(game.rematchVotes||[]).join(','),game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
  if(renderKey===signature)return;
  renderKey=signature;
  $('round-number').textContent=String(game.round+(active?0:ended?0:1)).padStart(2,'0');
  $('you-name').textContent=playerName(me).toUpperCase();$('enemy-name').textContent=playerName(enemy).toUpperCase();
  $('you-count').textContent=game.counts[me];$('enemy-count').textContent=game.counts[enemy];
  const last=game.last,showLast=active&&last?.cards?.length===2;
- const myShown=showLast?card(last.cards[me].id):own;
- const theirShown=showLast?card(last.cards[enemy].id):null;
- $('my-card').innerHTML=pokemonCard(myShown,showLast?last.stat:'');
- $('their-card').innerHTML=theirShown?pokemonCard(theirShown,last.stat):'<div class="card-back"><span>✦</span></div>';
+ const myShown=showLast?(activeThemeId()==='pokemon'?card(last.cards[me].id):last.cards[me]):own;
+ const theirShown=showLast?(activeThemeId()==='pokemon'?card(last.cards[enemy].id):last.cards[enemy]):null;
+ $('my-card').innerHTML=visibleCard(myShown,showLast?last.stat:'',showLast?{key:last.stat,value:last.values?.[me]}:null);
+ $('their-card').innerHTML=theirShown?visibleCard(theirShown,last.stat,{key:last.stat,value:last.values?.[enemy]}):activeThemeId()==='pokemon'?'<div class="card-back"><span>✦</span></div>':themeCard(null);
  const chooser=game.chooser===me;
  const paused=!practice&&Boolean(lobbySnapshot?.room?.paused);
  const canPlay=!active&&!ended&&!paused&&chooser&&!actionBusy&&(practice||networkState==='connected');
  $('battle-status').textContent=paused&&!ended?'PAUSED · WAITING FOR RECONNECTION':active?'BOTH CARDS REVEALED':ended?(game.winner===me?'MATCH WON':'MATCH OVER'):chooser?'YOUR TURN TO CHOOSE':'WAITING ON YOUR RIVAL';
  $('turn-power').textContent=active?'✦ REVIEW YOUR LAST BATTLE':ended?'✦ MATCH COMPLETE':chooser?'✦ YOU HAVE THE POWER':'⌛ YOUR RIVAL HAS THE POWER';
- $('controls-title').textContent=active?'REVIEW THE TWO POKÉMON.':ended?'THE SHOWDOWN IS OVER.':chooser?'THE NEXT MOVE IS YOURS.':'HOLD TIGHT. NEXT CARD IS COMING.';
+ $('controls-title').textContent=active?(activeThemeId()==='pokemon'?'REVIEW THE TWO POKÉMON.':'REVIEW THE REVEALED CARDS.'):ended?'THE SHOWDOWN IS OVER.':chooser?'THE NEXT MOVE IS YOURS.':'HOLD TIGHT. NEXT CARD IS COMING.';
  $('control-subtitle').textContent=active?'The next category unlocks after both have seen the result.':ended?'See the final result above.':chooser?'Choose the category you think will win.':'Your rival is choosing a category.';
- $('stat-buttons').innerHTML=STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(own?Number(own[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
+ $('stat-buttons').innerHTML=activeThemeId()==='pokemon'?STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(own?Number(own[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join(''):themeControlMarkup(canPlay,own);
  $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.stat)));
  $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE TIE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
  $('call-dock').classList.toggle('hidden',!session||session.mode!=='remote');
@@ -314,7 +399,8 @@ function showFinalResult(me){
 function showRoundResult(last,me){
  if(!last?.cards?.length)return;
  const enemy=1-me,tie=last.kind==='tie',win=last.winner===me;
- const mine=card(last.cards[me].id),theirs=card(last.cards[enemy].id);
+ const mine=activeThemeId()==='pokemon'?card(last.cards[me].id):last.cards[me];
+ const theirs=activeThemeId()==='pokemon'?card(last.cards[enemy].id):last.cards[enemy];
  const showNumber=x=>Number(x).toLocaleString(undefined,{maximumFractionDigits:2});
  const title=tie?'IT’S A TIE!':win?'YOU WON THIS ROUND!':'YOUR RIVAL WON THIS ROUND';
  const details=tie?'Both cards move to the jackpot.':win?'You collect both cards'+(last.awarded?.length>2?' and the jackpot.':'.'):'Your rival collects both cards'+(last.awarded?.length>2?' and the jackpot.':'.');

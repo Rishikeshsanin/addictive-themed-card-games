@@ -174,3 +174,65 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .theme-preview-links a{display:inline-flex;align-items:center;border:1px solid #9984be80;background:#4e41664c;border-radius:6px;min-height:37px;padding:8px 10px;font-size:10px;font-weight:800;color:#eee5ff}
 .theme-preview-links a:hover,.theme-preview-links a:focus-visible{border-color:var(--lime);color:var(--lime)}
 .theme-preview-caption{font-size:9px;text-align:center;color:#aea7be;letter-spacing:.06em;margin:12px 0 0}
+
+
+/* Round 5: theme selection and CSS-only expansion character treatments. */
+.theme-entry{position:relative;display:block;cursor:pointer;min-height:290px;border:1px solid #ffffff21;border-radius:17px;padding:23px;text-align:left;overflow:hidden;isolation:isolate;color:#fff;transition:transform .25s,border-color .25s;background:radial-gradient(ellipse at 65% 25%,#7360b966,transparent 62%),#1b1a35}
+.theme-entry[data-theme-id=avengers]{--theme-tint:#f5ac68;background:radial-gradient(circle at 65% 22%,#f1944a35,transparent 65%),#27202c}
+.theme-entry[data-theme-id=ben10]{--theme-tint:#a2ed73;background:radial-gradient(circle at 65% 22%,#63b84e40,transparent 65%),#172d2b}
+.theme-entry[data-theme-id=shinchan]{--theme-tint:#ffad8e;background:radial-gradient(circle at 65% 22%,#f7847840,transparent 65%),#2b2030}
+.theme-entry[data-theme-id=dc]{--theme-tint:#a9bfff;background:radial-gradient(circle at 65% 22%,#5a75d34d,transparent 65%),#181f37}
+.theme-entry[data-theme-id=naruto]{--theme-tint:#ffcd89;background:radial-gradient(circle at 65% 22%,#ef982c55,transparent 65%),#292334}
+.theme-entry[data-theme-id=cricket]{--theme-tint:#83edd0;background:radial-gradient(circle at 65% 22%,#2fbe9960,transparent 65%),#172f36}
+.theme-entry[data-theme-id=fantasy]{--theme-tint:#d6acff;background:radial-gradient(circle at 65% 22%,#b16dee50,transparent 65%),#281f3b}
+.theme-entry .theme-glyph{position:absolute;top:25px;right:10%;font-size:clamp(90px,12vw,160px);font-weight:800;opacity:.3;transform:rotate(-12deg);filter:drop-shadow(0 16px 30px #0008);pointer-events:none}
+.theme-entry .theme-content h3{font-size:clamp(19px,2.3vw,26px);line-height:1.15}
+.theme-entry .theme-content>span{color:var(--theme-tint,#caff58)}
+.theme-entry:hover,.theme-entry:focus-visible{border-color:var(--theme-tint,#caff58)}
+.theme-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0 13px}
+.theme-choice{display:flex;align-items:center;gap:9px;min-width:0;min-height:50px;border:1px solid #a395bc57;background:#ffffff08;color:#ede6fa;border-radius:10px;padding:9px 11px;text-align:left;font-size:10px;font-weight:800;cursor:pointer}
+.theme-choice-icon{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:8px;background:#ffffff15;font-size:17px}
+.theme-choice.selected,.theme-choice[aria-pressed=true]{border-color:var(--lime);background:#caff5816;color:var(--lime)}
+.theme-selection-note{color:#b5accb;font-size:11px;line-height:1.45;margin:0 0 24px}
+.theme-room-badge{display:inline-flex;align-items:center;gap:6px;border:1px solid #b59ef467;padding:9px 15px;background:#201b3ec7;color:#eddbff;border-radius:50px;font-weight:800;font-size:11px;letter-spacing:.06em;margin:15px 0 19px}
+body[data-online-theme]:not([data-online-theme=pokemon]) #battle{--theme-tint:#bca0f0}
+body[data-online-theme=avengers] #battle{--theme-tint:#f5ac68}
+body[data-online-theme=ben10] #battle{--theme-tint:#b0ed78}
+body[data-online-theme=shinchan] #battle{--theme-tint:#ffad8e}
+body[data-online-theme=dc] #battle{--theme-tint:#a9bfff}
+body[data-online-theme=naruto] #battle{--theme-tint:#ffcd89}
+body[data-online-theme=cricket] #battle{--theme-tint:#83edd0}
+body[data-online-theme=fantasy] #battle{--theme-tint:#d6acff}
+#battle .theme-battle-card{--theme-color:var(--theme-tint,#a59dff);position:relative;overflow:hidden;display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 22%,color-mix(in srgb,var(--theme-color) 23%,transparent),transparent 74%),linear-gradient(145deg,#2c2648,#15172b);border:1px solid color-mix(in srgb,var(--theme-color) 60%,#222);border-radius:13px;padding:12px;min-width:0;min-height:0;height:100%;box-shadow:inset 0 1px #ffffff25,0 12px 30px #0005}
+.theme-battle-card .theme-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#e7dff6;font-weight:800;font-size:10px;letter-spacing:.06em}
+.theme-battle-card .theme-card-top span:last-child{color:var(--theme-color)}
+.theme-battle-card .theme-portrait{position:relative;min-height:90px;flex:1 1 auto;display:grid;place-items:center;isolation:isolate;overflow:hidden}
+.theme-battle-card .theme-portrait::before{content:"";position:absolute;width:115px;aspect-ratio:1;border:1px solid color-mix(in srgb,var(--theme-color) 55%,transparent);border-radius:26%;transform:rotate(45deg);box-shadow:0 0 60px color-mix(in srgb,var(--theme-color) 15%,transparent)}
+.theme-battle-card .theme-portrait span{font-size:clamp(40px,5vw,70px);font-weight:800;line-height:1;color:var(--theme-color);filter:drop-shadow(0 9px 14px #0008);z-index:1}
+.theme-battle-card .theme-card-name{font-size:clamp(13px,1.8vw,18px);font-weight:800;line-height:1.2;overflow-wrap:anywhere;margin:2px 0 10px;text-align:center;color:#fff}
+.theme-battle-card .theme-card-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:auto}
+.theme-battle-card .theme-card-stat{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:9px;min-width:0;padding:6px;background:#ffffff0d;border-radius:5px}
+.theme-battle-card .theme-card-stat span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cbc3da}
+.theme-battle-card .theme-card-stat strong{font-size:10px;color:var(--theme-color);font-variant-numeric:tabular-nums}
+.theme-battle-card .theme-card-stat.best{outline:1px solid var(--theme-color);background:#ffffff18}
+.theme-battle-card .theme-revealed-note{font-size:10px;text-align:center;color:#d6cce2;line-height:1.45;margin:0 0 10px}
+.theme-battle-card .theme-back-portrait{filter:grayscale(.1);opacity:.75}
+#battle .theme-battle-card.theme-facedown{border-style:dashed;background:repeating-linear-gradient(145deg,#29213e,#29213e 9px,#1a1832 9px,#1a1832 18px)}
+#battle .theme-facedown .theme-portrait{min-height:115px}
+#battle .theme-facedown .theme-card-name{letter-spacing:.08em;color:#d2c1f3}
+#battle .theme-battle-card[data-theme-id=shinchan] .theme-portrait::before{border-radius:50%}
+#battle .theme-battle-card[data-theme-id=cricket] .theme-portrait::before{border-radius:50% 50% 15% 15%}
+#battle .theme-battle-card[data-theme-id=naruto] .theme-portrait::before{border-radius:15%}
+#battle .theme-battle-card[data-theme-id=fantasy] .theme-portrait::before{border-radius:15% 60%}
+#battle .theme-battle-card[data-theme-id=ben10] .theme-portrait::before{border-radius:35% 15%}
+#battle .stat-button span{min-width:0;overflow-wrap:anywhere}
+body[data-online-theme]:not([data-online-theme=pokemon]) #battle .stat-button:hover:enabled,body[data-online-theme]:not([data-online-theme=pokemon]) #battle .stat-button:focus-visible{border-color:var(--theme-tint)}
+body[data-online-theme]:not([data-online-theme=pokemon]) #battle .battle-label{color:var(--theme-tint)}
+body[data-online-theme]:not([data-online-theme=pokemon]) #battle .multi-player.mine{border-color:var(--theme-tint)}
+body[data-online-theme]:not([data-online-theme=pokemon]) #battle .pot-info{color:var(--theme-tint)}
+@media(max-width:1040px){.theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.theme-entry .theme-glyph{font-size:95px}}
+@media(max-width:700px){.theme-grid{grid-template-columns:minmax(0,1fr)!important}.theme-entry{min-height:240px}.theme-entry .theme-glyph{font-size:116px}.theme-choice{padding:8px;min-height:48px;font-size:10px}.theme-choice-icon{flex-basis:24px;height:24px}.theme-picker{gap:7px}}
+@media(max-width:540px){.theme-battle-card .theme-card-stats{gap:4px}.theme-battle-card .theme-card-stat{font-size:8px;padding:5px}.theme-battle-card .theme-card-stat strong{font-size:9px}.multi-arena .theme-battle-card .theme-portrait{min-height:88px;max-height:100px}.multi-arena .theme-battle-card .theme-card-name{font-size:14px}.theme-room-badge{font-size:10px;max-width:100%;text-wrap:balance}}
+@media(prefers-reduced-motion:reduce){.theme-entry,.theme-choice,.theme-battle-card{transition:none!important;animation:none!important}}
+
+.theme-entry:hover{transform:translateY(-6px)}

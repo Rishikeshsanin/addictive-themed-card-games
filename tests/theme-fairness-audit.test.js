@@ -40,11 +40,13 @@ test('all seven thematic 80-card rosters use eight meaningful typed comparisons'
   assert.ok(['critical','high','medium','low','none'].includes(c.severity));
  }
 });
-test('Cricket Dhoni specialism is preserved, and vague women’s allround taxonomy is diagnosed',()=>{
+test('Cricket Dhoni specialism remains stable; Round 5 corrects blanket women allround taxonomy',()=>{
  const ms=THEME_PACKS.cricket.cards.find(x=>x.name==='MS Dhoni');
  assert.ok(ms);assert.equal(ms.role,'keeper');assert.equal(ms.group,'Wicketkeepers & Captains');
  const inv=rosterAudit();
- assert.ok(inv.allCards.some(c=>c.themeId==='cricket'&&c.name==='Mithali Raj'&&c.flags.some(f=>f.includes('taxonomy_loss'))));
+ const mithali=inv.allCards.find(c=>c.themeId==='cricket'&&c.name==='Mithali Raj');
+ assert.ok(mithali);assert.equal(mithali.role,'bat');
+ assert.ok(!mithali.flags.some(f=>f.includes('taxonomy_loss')),'Previously flagged role was corrected');
  assert.ok(inv.allCards.some(c=>c.themeId==='cricket'&&c.name==='MS Dhoni'&&c.review.some(r=>r.reason.includes('MUST remain'))));
 });
 test('Shin-chan packs 20 identifiable characters x exactly four invented scenarios, not aliases',()=>{
