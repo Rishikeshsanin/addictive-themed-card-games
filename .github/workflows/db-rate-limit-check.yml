@@ -1,0 +1,51 @@
+name: DeckVerse disposable PostgreSQL rate-limit QA
+on:
+  pull_request:
+    branches:
+      - integration/deckverse-v2-api-wiring
+    paths:
+      - 'tests/db-rate-limit-*.mjs'
+      - 'migrations/005_deckverse_rate_limits.sql'
+      - '.github/workflows/db-rate-limit-check.yml'
+      - 'src/server/rate-limit.js'
+      - 'api/game.js'
+      - 'api/livekit-token.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  db-rate-limit-postgresql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: deckverse_rate_test
+          POSTGRES_USER: deckverse_ci_admin
+          POSTGRES_PASSWORD: ci_disposable_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U deckverse_ci_admin -d deckverse_rate_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund --ignore-scripts
+      - name: Verify disposable test is syntactically valid
+        run: node --check tests/db-rate-limit-postgres.mjs
+      - name: Run real PostgreSQL SQL/RLS/concurrency suite (synthetic records only)
+        env:
+          PG_ADMIN_URL: postgresql://deckverse_ci_admin:ci_disposable_only@127.0.0.1:5432/deckverse_rate_test
+          PG_APP_URL: postgresql://deckverse_app:ci_app_ephemeral_only@127.0.0.1:5432/deckverse_rate_test
+          PG_APP_PASSWORD: ci_app_ephemeral_only
+        run: node --test --test-concurrency=1 tests/db-rate-limit-postgres.mjs
