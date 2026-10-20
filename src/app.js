@@ -2,7 +2,7 @@ import {STAT_FIELDS,DECKS,deckFor,card,art} from './catalog.js';
 import {newGame,takeTurn,viewFor,secureIndex} from './engine.js';
 import {initCallControls,disconnectCall,getCallAvailability} from './livekit-call.js';
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let screen='landing',mode='same',session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
+let screen='landing',mode='same',roomSize=2,session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
 let pollBusy=false,actionBusy=false,readyBusy=false,pollTimer=null,revealTimer=null,renderKey='',lobbySnapshot=null,callHealthChecked=false;
 let pollEpoch=0,pollDelay=0,networkState='connected';
 function networkStatus(state){if(networkState===state)return;networkState=state;const box=$('network-status');if(!box)return;box.classList.toggle('hidden',state==='connected');box.textContent=state==='offline'?'OFFLINE · Your room is preserved. Reconnect to continue.':'RECONNECTING · Your cards and room remain safe.';renderKey='';if(screen==='battle'&&game)renderBattle();}
@@ -42,6 +42,10 @@ function init(){
  $('hero-how').addEventListener('click',()=>document.querySelector('#how').scrollIntoView({behavior:'smooth'}));
  $('setup-back').addEventListener('click',()=>show('landing'));
  document.querySelectorAll('.mode-card').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('.mode-card').forEach(n=>n.classList.toggle('selected',n===b))}));
+ document.querySelectorAll('[data-player-count]').forEach(button=>button.addEventListener('click',()=>{
+  roomSize=Number(button.dataset.playerCount);
+  document.querySelectorAll('[data-player-count]').forEach(option=>{const selected=option===button;option.classList.toggle('selected',selected);option.setAttribute('aria-pressed',String(selected));});
+ }));
  $('create-room').onclick=()=>enterRoom('create');$('join-room').onclick=()=>enterRoom('join');$('practice-btn').onclick=startPractice;
  $('copy-code').onclick=async()=>{const code=session?.code;if(!code)return;const url=location.origin+'/?room='+code;try{await navigator.clipboard.writeText(url);toast('INVITE LINK COPIED ✦')}catch{toast('ROOM CODE: '+code)}};
  $('toggle-ready').onclick=()=>toggleReady();
@@ -71,7 +75,7 @@ function init(){
 function startPractice(){saveName();stopPolling();resetReveal();disconnectCall();callHealthChecked=false;session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
 const API='/api/game';
 async function api(action,body={}){let response;try{response=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})})}catch{throw Error('Cannot connect to the game server. Check your internet connection.')};const data=await response.json().catch(()=>({error:'Unexpected server response'}));if(!response.ok||data.error)throw Error(data.error||'Room request failed');return data}
-async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
+async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code,playerCount:roomSize});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
 async function roomAction(action,params={}){
  if(!session)return false;
  actionBusy=true;
@@ -105,12 +109,12 @@ function updateRoom(data){
 function renderLobby(data){
  if(!data?.room||!session)return;
  $('room-code').textContent=data.room.code;
- const people=data.players||[];
- $('lobby-players').innerHTML=[0,1].map(i=>{const p=people.find(x=>x.index===i);return '<div class="player-slot"><span>'+(p?(i===0?'⚡':'🔥'):'◇')+'</span><strong>'+escapeHtml(p?.name||'WAITING FOR RIVAL')+'</strong><small>'+(p?(p.ready?'● READY':'○ NOT READY'):'INVITE SOMEONE TO JOIN')+'</small></div>'}).join('');
- $('lobby-message').textContent=people.length<2?'Share the invite link or code with your friend.':people.every(x=>x.ready)?'Both players ready. Let the battle begin!':'Waiting for both players to get ready…';
+ const people=data.players||[],count=data.room.playerCount||2;
+ $('lobby-players').innerHTML=Array.from({length:count},(_,i)=>i).map(i=>{const p=people.find(x=>x.index===i);return '<div class="player-slot"><span>'+(p?(i===0?'⚡':'🔥'):'◇')+'</span><strong>'+escapeHtml(p?.name||'WAITING FOR RIVAL')+'</strong><small>'+(p?(p.ready?'● READY':'○ NOT READY'):'INVITE SOMEONE TO JOIN')+'</small></div>'}).join('');
+ $('lobby-message').textContent=people.length<count?'Share the invite link: '+people.length+'/'+count+' players joined.':people.every(x=>x.ready)?'Everyone is ready. Let the battle begin!':'Waiting for all players to get ready…';
  $('toggle-ready').textContent=session.me.ready?'✓ READY — TAP TO UNREADY':"I'M READY";
  $('toggle-ready').disabled=readyBusy;
- $('start-match').disabled=!(session.me.index===0&&people.length===2&&people.every(x=>x.ready));
+ $('start-match').disabled=!(session.me.index===0&&people.length===count&&people.every(x=>x.ready));
  $('start-match').classList.toggle('hidden',session.me.index!==0);
  const host=session.me.index===0;
  const control=$('reveal-setting'),settings=data.room.revealSettings||{mode:'auto',seconds:2};
@@ -166,6 +170,7 @@ function queueRevealRefresh(){
 }
 function renderBattle(){
  if(!game)return;
+ if(!practice&&game.playerCount>2){renderMultiBattle();return;}
  const me=practice?0:game.me,enemy=1-me,own=game.topCard;
  const active=revealing(),ended=game.status==='finished';
  const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
@@ -208,10 +213,11 @@ function showFinalResult(me){
  const forfeit=game.endReason==='forfeit',win=game.winner===me;
  const wantsRematch=game.rematchVotes?.includes(me);
  const votes=game.rematchVotes?.length||0;
- const rematchAvailable=Boolean(session&&!forfeit&&session.players?.length===2);
+ const expected=game.playerCount||2;
+ const rematchAvailable=Boolean(session&&!forfeit&&session.players?.length===expected);
  const action=practice?'REMATCH THE BOT ↗':rematchAvailable?(wantsRematch?'✓ REMATCH REQUESTED':'⚡ PLAY AGAIN — REMATCH ↗'):'BACK TO ROOMS ↗';
  $('result').className='result-pop final '+(win?'win':'loss');
- $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED BY FORFEIT'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':'50 CARDS · ONE LEGEND')+' · MATCH '+(game.matchNumber||1)+'</p><button class="btn btn-primary" id="play-again" '+(wantsRematch?'disabled':'')+'>'+action+'</button>'+(rematchAvailable?'<small class="rematch-status">'+(wantsRematch?'Waiting for your rival to agree…':votes+'/2 players requested a rematch')+'</small>':'');
+ $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED BY FORFEIT'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':game.total+' CARDS · ONE LEGEND')+' · MATCH '+(game.matchNumber||1)+'</p><button class="btn btn-primary" id="play-again" '+(wantsRematch?'disabled':'')+'>'+action+'</button>'+(rematchAvailable?'<small class="rematch-status">'+(wantsRematch?'Waiting for the others to agree…':votes+'/'+expected+' players requested a rematch')+'</small>':'');
  $('result').classList.remove('hidden');
  $('play-again').onclick=async()=>{
   if(practice)return startPractice();
