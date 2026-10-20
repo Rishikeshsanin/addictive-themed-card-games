@@ -5,6 +5,7 @@ import {startMultiGame,multiTurn,multiViewFor} from '../src/multi-engine.js';
 import {DECKS} from '../src/catalog.js';
 import {revealState,revealDeadline,mayAdvance,validateRevealSettings} from '../src/reveal.js';
 import {decideRematch} from '../src/rematch.js';
+import {enforceRateLimit,recordRateLimitFailure,writeRateLimitResponse} from '../src/server/rate-limit.js';
 const dbUrl=process.env.DECKVERSE_DATABASE_URL;
 const sql=dbUrl?postgres(dbUrl,{ssl:'require',max:3,prepare:false,idle_timeout:15,connect_timeout:9}):null;
 const hash=val=>createHash('sha256').update(val).digest('hex');
@@ -117,7 +118,19 @@ export default async function handler(req,res){
  try{
   const db=await connected();let b=req.body;
   if(!b||typeof b!=='object'||Array.isArray(b)||JSON.stringify(b).length>6000||!allowedAction.has(b.action))throw fail('Invalid request.');
-  const result=b.action==='create'?await create(db,b):b.action==='join'?await join(db,b):await action(db,b);
+  await enforceRateLimit(db,req,{route:'game',action:b.action,code:b.code,token:b.token});
+  let result;
+  try { result=b.action==='create'?await create(db,b):b.action==='join'?await join(db,b):await action(db,b); }
+  catch(error){
+    if(b.action==='join'&&error.status===404)await recordRateLimitFailure(db,req,{kind:'invalid-code'});
+    else if(error.status===401)await recordRateLimitFailure(db,req,{kind:'auth-failure'});
+    throw error;
+  }
   return res.status(200).json(result);
- }catch(e){const status=e.status||((e.code==='23505')?409:500);const msg=e.status?e.message:e.code==='23505'?'That room is already occupied.':'The game server could not finish the request.';if(status===500)console.error('deckverse error',e.code||e.message);return res.status(status).json({error:msg});}
+ }catch(e){
+   if(writeRateLimitResponse(res,e))return;
+   // Fail closed when durable limiter storage is unavailable: never continue unprotected.
+   if(!e.status&&e.code!=='23505'){console.error('deckverse server unavailable',e.code||e.name||'internal');return res.status(503).json({error:'Game service temporarily unavailable. Please retry.'});}
+   return res.status(e.status||(e.code==='23505'?409:503)).json({error:e.status?e.message:'That room is already occupied.'});
+ }
 }
