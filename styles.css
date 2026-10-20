@@ -167,3 +167,10 @@ html,body,#app{max-width:100%;overflow-x:clip}
 button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
 .stat-button{min-height:44px}
 #battle button{min-height:44px}
+
+/* Theme Lab links, development branch only. No online-themed-room claims. */
+.theme-preview-links{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px;margin:26px 0 5px;padding:14px;border:1px solid #b9a78545;border-radius:12px;background:#211b3366}
+.theme-preview-links>span{font-size:10px;font-weight:900;letter-spacing:1px;color:#d8c5a0;margin-right:5px}
+.theme-preview-links a{display:inline-flex;align-items:center;border:1px solid #9984be80;background:#4e41664c;border-radius:6px;min-height:37px;padding:8px 10px;font-size:10px;font-weight:800;color:#eee5ff}
+.theme-preview-links a:hover,.theme-preview-links a:focus-visible{border-color:var(--lime);color:var(--lime)}
+.theme-preview-caption{font-size:9px;text-align:center;color:#aea7be;letter-spacing:.06em;margin:12px 0 0}
