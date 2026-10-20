@@ -58,7 +58,7 @@ async function roomAction(action,params={}){
  actionBusy=true;
  try{const data=await api(action,{code:session.code,token:session.token,...params});updateRoom(data);return true}
  catch(e){toast(e.message);return false}
- finally{actionBusy=false}
+ finally{actionBusy=false;if(screen==='battle'&&game){renderKey='';renderBattle()}}
 }
 async function toggleReady(){
  if(!session||readyBusy||!lobbySnapshot)return;
