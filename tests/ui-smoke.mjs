@@ -20,7 +20,7 @@ try {
  await page.screenshot({path:'/tmp/deckverse-desktop.png',fullPage:true});
  const chose=await page.locator('.stat-button:not([disabled])').count();
  if(chose)await page.locator('.stat-button:not([disabled])').first().click();
- else assert.equal(await page.locator('#battle-status').textContent(),'WAITING ON YOUR RIVAL');
+ else assert.ok(['WAITING ON YOUR RIVAL','BOTH CARDS REVEALED'].includes(await page.locator('#battle-status').textContent()),'Bot can be waiting or revealing its first move');
  await page.locator('#result.compact').waitFor({timeout:5500});
  assert.ok(await page.locator('#my-card .card-name').isVisible(),'Our played card is visible during result');
  assert.ok(await page.locator('#their-card .card-name').isVisible(),'Opponent played card is visible during result');
