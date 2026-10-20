@@ -1,6 +1,6 @@
 import postgres from 'postgres';
 import {createHash,randomBytes,randomInt} from 'node:crypto';
-import {getServerTheme,requireCreateTheme,requireSameRoomTheme,themeIdForRoom} from '../src/server/theme-registry.js';
+import {getServerTheme,requireCreateTheme,themeIdForRoom} from '../src/server/theme-registry.js';
 import {startServerThemeMatch,takeServerThemeTurn,themeViewFor} from '../src/server/theme-match.js';
 import {revealState,revealDeadline,mayAdvance,validateRevealSettings} from '../src/reveal.js';
 import {decideRematch} from '../src/rematch.js';
@@ -16,8 +16,63 @@ const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const playerCountOf=r=>r.player_count||2;
 const newMatch=(n,themeId)=>startServerThemeMatch({playerCount:n,themeId});
 const validThemeRequest=body=>{try{return requireCreateTheme(body)}catch{throw fail('Invalid theme or client-controlled deck settings.',400)}};
-const roomTheme=(room,proposed)=>{try{return requireSameRoomTheme(room,proposed)}catch{throw fail('Room theme is fixed for this match.',409)}};
+export function roomTheme(room,proposed){
+ let persisted;
+ try{persisted=themeIdForRoom(room);}catch{throw fail('Room theme data is unavailable.',503);}
+ if(proposed!==undefined&&(typeof proposed!=='string'||proposed!==persisted))
+  throw fail('Room theme is fixed for this match.',409);
+ return persisted;
+}
 const allowedAction=new Set(['create','join','get','ready','start','rematch','select','settings','ack','leave','heartbeat']);
+const forbiddenClientFields=new Set([
+ 'theme_id','cards','card','cardId','cardIds','deck','decks','deckOrder',
+ 'manifest','manifests','categories','stats','scores','score','cardValues',
+ 'cardStats','statValues','rank','seed','picker','shuffle','chooser',
+ 'state','game','players','hands','pot','winner','status','total','round',
+ 'last','topCard','revealedCards','nextCards'
+]);
+// Preserve ordinary V2 clients that supply harmless join setup hints; reject
+// anything which could impersonate the trusted server's card or game state.
+export function validateGameRequestBody(body){
+ if(!body||typeof body!=='object'||Array.isArray(body)||!allowedAction.has(body.action))
+  throw fail('Invalid request.');
+ let length;
+ try{length=JSON.stringify(body)?.length;}catch{throw fail('Invalid request.');}
+ if(!Number.isSafeInteger(length)||length>6000)throw fail('Invalid request.');
+ for(const key of Object.keys(body))
+  if(forbiddenClientFields.has(key))throw fail('Client-controlled game state is forbidden.');
+ return body;
+}
+// Migration 007 is optional for historical Pokémon sessions and existing
+// Pokémon room creation. Expansion rooms require its full immutability contract.
+// Partly installed 007 must never silently fall back to the legacy insert.
+export function resolveThemeStoragePlan(status,themeId){
+ if(!status||typeof status!=='object')throw fail('Theme database setup incomplete.',503);
+ const {column_ready,column_check_ready,trigger_ready}=status;
+ if([column_ready,column_check_ready,trigger_ready].some(v=>typeof v!=='boolean'))
+  throw fail('Theme database setup incomplete.',503);
+ if(column_ready){
+  if(!column_check_ready||!trigger_ready)
+   throw fail('Theme database migration 007 is incomplete.',503);
+  return 'theme-column';
+ }
+ if(column_check_ready||trigger_ready||themeId!=='pokemon')
+  throw fail('Theme database migration 007 is required.',503);
+ return 'legacy-pokemon';
+}
+async function themeStoragePlan(db,themeId){
+ const [row]=await db`SELECT
+  EXISTS(SELECT 1 FROM pg_attribute a WHERE a.attrelid=to_regclass('deckverse.rooms')
+    AND a.attname='theme_id' AND NOT a.attisdropped AND a.attnotnull
+    AND a.atttypid='pg_catalog.varchar'::regtype AND a.atttypmod=36) AS column_ready,
+  EXISTS(SELECT 1 FROM pg_constraint c WHERE c.conrelid=to_regclass('deckverse.rooms')
+    AND c.conname='rooms_theme_id_check' AND c.contype='c' AND c.convalidated)
+    AS column_check_ready,
+  EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid=to_regclass('deckverse.rooms')
+    AND t.tgname='deckverse_rooms_theme_immutable'
+    AND NOT t.tgisinternal AND t.tgenabled='O') AS trigger_ready`;
+ return resolveThemeStoragePlan(row,themeId);
+}
 let verified=false;
 async function connected(){if(!sql)throw fail('Game rooms are awaiting an isolated database connection. Solo practice is available.',503);if(!verified){const [r]=await sql`select current_user as role`;if(r.role!=='deckverse_app')throw fail('Game backend configuration failed its dedicated-role security check.',503);verified=true;}return sql}
 export const safeName=n=>{if(typeof n!=='string'||n.trim().length<2||n.trim().length>24||/[<>\p{Cc}\p{Cf}]/u.test(n))throw fail('Name must be 2–24 visible characters without HTML symbols.');return n.trim()};
@@ -56,7 +111,7 @@ async function updatePresence(tx,room,actorSeat,{refresh=true}={}){
 // A single MVCC statement atomically observes room and roster. Do not split into
 // two READ COMMITTED queries: host, state and player rows could come from different commits.
 // Token hashes are kept strictly server-side and never returned to the browser.
-async function snapshot(db,code,token){
+async function snapshot(db,code,token,proposedTheme){
  const digest=safeToken(token);
  const rows=await db`select r.*,p.seat as player_seat,p.name as player_name,
    p.ready as player_ready,p.active as player_active,p.token_hash as player_token_hash,
@@ -77,7 +132,7 @@ async function snapshot(db,code,token){
  const presence=derivePresence(room,players,rows[0].observed_at);
  const activePolicy=room.state?.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
  const reveal=room.state?.last?revealState({...activePolicy,required:count,until:room.reveal_until,acks:room.reveal_acks}):null;
- const themeId=themeIdForRoom(room);
+ const themeId=roomTheme(room,proposedTheme);
  const theme=getServerTheme(themeId);
  const view=room.state?themeViewFor(room.state,me.index,{roomThemeId:themeId}):null;
  const game=view?{...view,reveal,endReason:room.state.endReason||null,matchNumber:room.state.matchNumber||1,rematchVotes:room.status==='finished'?players.filter(p=>p.ready).map(p=>p.seat):[]}:null;
@@ -110,21 +165,27 @@ async function create(db,b){
  await sweepExpiredRoomSessions(db);
  const name=safeName(b.name),mode=safeMode(b.mode),count=b.playerCount??2,themeId=validThemeRequest(b),raw=secret(),digest=hash(raw);
  if(![2,3,4].includes(count))throw fail('Room size must be 2, 3 or 4.');
+ const storage=await themeStoragePlan(db,themeId);
  const [active]=await db`select count(*)::integer as count from deckverse.rooms where expires_at>now() and status in ('lobby','playing')`;if(active.count>300)throw fail('Active-room capacity reached. Try again later.',429);
  for(let tries=0;tries<6;tries++){
  const c=code();try{
- await db.begin(async tx=>{const [r]=await tx`insert into deckverse.rooms(code,mode,status,player_count,theme_id,expires_at) values(${c},${mode},'lobby',${count},${themeId},clock_timestamp()+${retentionSeconds('lobby')}*interval '1 second') returning id`;await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,last_seen_at) values(${r.id},0,${name},${digest},true,clock_timestamp())`;});
- return {...await snapshot(db,c,raw),token:raw};
+ await db.begin(async tx=>{
+  const [r]=storage==='theme-column'?
+   await tx`insert into deckverse.rooms(code,mode,status,player_count,theme_id,expires_at) values(${c},${mode},'lobby',${count},${themeId},clock_timestamp()+${retentionSeconds('lobby')}*interval '1 second') returning id`:
+   await tx`insert into deckverse.rooms(code,mode,status,player_count,expires_at) values(${c},${mode},'lobby',${count},clock_timestamp()+${retentionSeconds('lobby')}*interval '1 second') returning id`;
+  await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,last_seen_at) values(${r.id},0,${name},${digest},true,clock_timestamp())`;
+ });
+ return {...await snapshot(db,c,raw,themeId),token:raw};
  }catch(e){if(e.code!=='23505'||tries===5)throw e}
  }throw fail('Could not create room. Please try again.',503);
 }
 async function join(db,b){const c=safeCode(b.code),name=safeName(b.name),raw=secret(),digest=hash(raw);
  await db.begin(async tx=>{const r=await readRoom(tx,c,true);roomTheme(r,b.themeId);if(r.status!=='lobby')throw fail('This match has already started.');const existing=await tx`select seat,name from deckverse.players where room_id=${r.id} and active=true`;if(existing.length>=playerCountOf(r))throw fail('This room is full.');if(existing.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw fail('Please choose a different nickname.');const seat=Array.from({length:playerCountOf(r)},(_,i)=>i).find(i=>!existing.some(p=>p.seat===i));await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,active,last_seen_at) values(${r.id},${seat},${name},${digest},false,true,clock_timestamp()) on conflict (room_id,seat) do update set name=excluded.name,token_hash=excluded.token_hash,ready=false,active=true,left_at=null,last_seen_at=clock_timestamp()`;await tx`update deckverse.rooms set expires_at=clock_timestamp()+${retentionSeconds('lobby')}*interval '1 second' where id=${r.id}`;});
- return {...await snapshot(db,c,raw),token:raw};
+ return {...await snapshot(db,c,raw,b.themeId),token:raw};
 }
 async function action(db,b){
  const c=safeCode(b.code);safeToken(b.token);
- if(b.action==='get')return snapshot(db,c,b.token);
+ if(b.action==='get')return snapshot(db,c,b.token,b.themeId);
  if(b.action==='leave'){await db.begin(async tx=>{
   const room=await readRoom(tx,c,true);roomTheme(room,b.themeId);const me=await auth(tx,room,b.token);
   await tx`update deckverse.players set active=false,ready=false,left_at=clock_timestamp()
@@ -203,15 +264,15 @@ async function action(db,b){
      await tx`update deckverse.rooms set state=${tx.json(state)},status=${state.status},reveal_until=${until},reveal_acks='[]'::jsonb,expires_at=clock_timestamp()+${retentionSeconds(state.status)}*interval '1 second',updated_at=clock_timestamp() where id=${room.id}`;
    }else throw fail('Unknown action.');
  });
- return snapshot(db,c,b.token);
+ return snapshot(db,c,b.token,b.themeId);
 }
 export default async function handler(req,res){
  res.setHeader('cache-control','no-store');res.setHeader('x-content-type-options','nosniff');
  if(req.method==='GET'){if(new URL(req.url,'https://deckverse.invalid').searchParams.has('health')){try{await connected();return res.status(200).json({status:'ready',app:'deckverse'})}catch{return res.status(503).json({status:'setup_required',app:'deckverse'})}}return res.status(405).json({error:'POST required.'})}
  if(req.method!=='POST')return res.status(405).json({error:'POST required.'});
  try{
-  const db=await connected();let b=req.body;
-  if(!b||typeof b!=='object'||Array.isArray(b)||JSON.stringify(b).length>6000||!allowedAction.has(b.action))throw fail('Invalid request.');
+  const db=await connected();const b=validateGameRequestBody(req.body);
+
   await enforceRateLimit(db,req,{route:'game',action:b.action,code:b.code,token:b.token});
   let result;
   try { result=b.action==='create'?await create(db,b):b.action==='join'?await join(db,b):await action(db,b); }
