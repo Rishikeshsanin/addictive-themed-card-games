@@ -36,11 +36,11 @@ The existing `db-presence-check.yml` CI workflow provisions a fictional local Po
 
 The updated Agent C suite tests: 15s/45s/2m/5m thresholds, 2/3/4 transfer, 24h active TTL and four-hour recovery, lobby/finished 30m leases, database-trusted timestamps, old token invalidation, forged session/timestamp inputs, expired-seat soft cleanup, idempotency, simultaneous cleanup and heartbeat, host-settings race, leave/heartbeat race, concurrent round selection, hidden-card/token protection and consistent multi-request snapshots. Synthetic browser background testing is **not physical device testing**.
 
-**CI result:** Record the actual run URL, number of passing/failing tests and commit SHA only after the workflow finishes. Do not assert a pass from mocked time. Run: `node --test tests/db-presence-check.mjs` under the disposable-only CI environment. `npm test` covers pure game and policy units separately.
+**Verified on 2026-10-20:** [Disposable PostgreSQL presence run 39459583258](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39459583258) **SUCCESS: 20 tests / 20 passed / 0 failed**. Job output confirms real PostgreSQL 16 service, migrations 004/005/006 in local synthetic DeckVerse schema, and real API handler transactions. [Standard DeckVerse CI run 39459583229](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39459583229) also passed. Initial verification commit `155479741c370b68eb4c17d002e58e6a0314428f`. This is *not* a live Supabase, long-duration soak, or physical-device test. Run: `node --test tests/db-presence-check.mjs` under the disposable-only CI environment. `npm test` covers game/policy unit tests.
 
 ## Release gates
 
-- [ ] Disposable PostgreSQL updated suite passes, and existing CI remains green
+- [x] Disposable PostgreSQL 20/20 test suite passed and existing CI green on initial commit; reverify head on any later changes
 - [ ] Verify the real DeckVerse schema, RLS/grants, legacy `expires_at` rows and rollout/rollback sequence **read-only**, then obtain separate explicit approval for any future real migration
 - [ ] Confirm operational metrics and policy for indefinite **stored** historical rows, bounded opportunistic cleanup, and whether separately authorized archival/deletion is desired
 - [ ] Real physical iOS/Android background/suspend/network switch and cross-instance Vercel stress tests
