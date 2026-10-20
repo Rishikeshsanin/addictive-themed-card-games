@@ -48,6 +48,16 @@ async function run(){
   assert.deepEqual(other.game.last.cards,next.game.last.cards,'Both players must see the same resolved cards');
   assert.equal(other.game.reveal.active,true);
   assert.equal(other.game.last.values.length,2);
+  // Changing host settings in the middle of a reveal must not alter that reveal.
+  const updated=await call('settings',{...hostAuth,mode:'auto',seconds:5});
+  assert.equal(updated.room.revealSettings.mode,'auto');
+  assert.equal(updated.room.revealSettings.seconds,5);
+  assert.equal(updated.game.reveal.mode,'manual');
+  const unchanged=await call('get',guestAuth);
+  assert.equal(unchanged.game.reveal.mode,'manual');
+  try{await call('settings',{...guestAuth,mode:'auto',seconds:2});assert.fail('Guest settings change should be forbidden')}
+  catch(e){assert.equal(e.status,403);}
+
   const newChooser=next.game.chooser;
   const newToken=newChooser===0?hostAuth.token:guestAuth.token;
   try{await call('select',{code,token:newToken,stat:'rank',expectedRound:1});assert.fail('Early round selection should be blocked')}
@@ -56,7 +66,7 @@ async function run(){
   const one=await call('get',guestAuth);assert.equal(one.game.reveal.active,true);assert.deepEqual(one.game.reveal.acks,[0]);
   await call('ack', {...guestAuth,expectedRound:1});
   const both=await call('get',hostAuth);assert.equal(both.game.reveal.active,false);assert.deepEqual(both.game.reveal.acks,[0,1]);
-  const second=await call('select',{code,token:newToken,stat:'rank',expectedRound:1});assert.equal(second.game.round,2);
+  const second=await call('select',{code,token:newToken,stat:'rank',expectedRound:1});assert.equal(second.game.round,2);assert.equal(second.game.reveal.mode,'auto');assert.equal(second.game.reveal.seconds,5);
   metrics.totalMs=Math.round(now()-totalStart);
   console.log('PASS: remote 2-player create/join/ready, host settings, concealed decks, both-card reveal, blocked early turn, two-ack manual confirmation, second round; '+JSON.stringify(metrics));
  }finally{
