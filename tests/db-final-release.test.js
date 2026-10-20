@@ -107,7 +107,7 @@ test('real local PG: backup, double-migrate, capacity, restore and locking', {sk
 
   // Prove an ALTER is bounded by the migration lock_timeout and leaves no half-upgrade.
   const holder=spawn(pg.psql,['-X','-q','-At','-v','ON_ERROR_STOP=1',
-   '-c','BEGIN; LOCK TABLE deckverse.players IN ACCESS SHARE MODE; SELECT 12345;',
+   '-c','BEGIN; LOCK TABLE deckverse.rooms IN ACCESS SHARE MODE; SELECT 12345;',
    '-c','SELECT pg_sleep(6); COMMIT;'],{env:{...process.env,...env},stdio:['ignore','pipe','pipe']});
   const marker=await new Promise((resolve,reject)=>{
    let buf='';const to=setTimeout(()=>reject(Error('Lock holder never acquired relation')),5000);
