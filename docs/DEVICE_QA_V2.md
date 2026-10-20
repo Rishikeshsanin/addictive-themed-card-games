@@ -77,7 +77,7 @@ Suggested evidence table: test ID, devices/OS/browser/network, candidate commit/
 - **PASS — Node + mocked LiveKit SDK**: `node --test tests/livekit-mobile-lifecycle.mjs` — 6/6 on Node 22.16.0, covering lazy connect, mic toggles/labels, deduplicated tracks, multiple cameras, audio unlock, camera switching, permission problems, reconnected/failed disconnect UI, stop/detach/listener cleanup, abort of an in-flight token fetch and safe 403 authorization error handling. Test uses simulated DOM and simulated participant/events; no real packets are exchanged.
 - **PASS — JS syntax**: `node --check src/livekit-call.js` (local).
 - **Previously verified on production baseline, not rerun against this change**: two independent desktop Chrome sessions with synthetic microphone/camera published and received LiveKit Cloud media (`tests/livekit-browser.mjs`). This is neither physical-mobile evidence nor Agent E branch verification.
-- **NOT RUN on this branch**: real LiveKit Cloud two-way audio/video, browser emulation with actual WebRTC, expired real token, real 4G↔Wi-Fi handoff, Safari/iOS or Android device capture, real multi-device camera switching, screen recordings, or long call soak. Do not label these PASS.
+- **NOT RUN on this branch**: real LiveKit Cloud two-way audio/video, the new `node tests/livekit-mobile-browser.mjs` Playwright harness (browser navigation was blocked in the local runner; this harness uses synthetic media and a mocked SDK, not a real LiveKit Cloud call), browser emulation with actual WebRTC, expired real token, real 4G↔Wi-Fi handoff, Safari/iOS or Android device capture, real multi-device camera switching, screen recordings, or long call soak. Do not label these PASS.
 
 ### Exact physical-device matrix (record results; all currently PENDING)
 
@@ -108,7 +108,7 @@ Use **iPhone Safari** (current stable iOS, non-private tab) + **Android Chrome**
 
 ### Coordinator integration requests (no unauthorized edits)
 
-1. **Shared CI owner:** add `node --test tests/livekit-mobile-lifecycle.mjs` to the shared CI workflow or package test script after reviewing the test. It is intentionally a `.mjs` file, so existing `npm test` (`tests/*.test.js`) will **not** execute it.
+1. **Shared CI owner:** add `node --test tests/livekit-mobile-lifecycle.mjs` and `node tests/livekit-mobile-browser.mjs` to the shared CI workflow (Chrome with `CHROME_PATH` available) or package test script after reviewing the tests. It is intentionally a `.mjs` file, so existing `npm test` (`tests/*.test.js`) will **not** execute it.
 2. **Shared HTML/CSS owner (Agent D/coordinator):** verify expanded remote-video grid/individual feeds visually on a 3–4-player mobile viewport and adjust call-dock responsive CSS, overlay stacking and at-least-44px controls without hiding cards. Agent E did not edit shared CSS/HTML.
 3. **Shared token endpoint owner (Agent B/coordinator):** implement durable rate limits and expiry/revocation messaging only in authorized server work. No LiveKit secret or token endpoints were modified by Agent E.
 4. **Integration gate:** run `tests/livekit-browser.mjs` (two real LiveKit connections with fake devices) **against a safely provisioned candidate deployment**, not production V1.2; then run LK-01–20 with actual devices. A token/permission emulator cannot prove network-media correctness.
