@@ -247,6 +247,26 @@ test('bounded indexed cleanup reclaims expired rows under limited role',async()=
   expiryIndexBytes:Number(index.bytes)}));
 });
 
+test('expiry index handles larger high-cardinality counter growth efficiently',async()=>{
+ await admin.unsafe(`INSERT INTO deckverse.rate_limit_counters
+   (scope,key_hash,window_start,expires_at,hits)
+   SELECT 'db-index-scale',repeat(md5('scale-'||g::text),2),
+     statement_timestamp()-interval '2 hours',
+     CASE WHEN g <= 1200 THEN statement_timestamp()-interval '3 minutes'
+     ELSE statement_timestamp()+interval '30 minutes' END,1
+   FROM generate_series(1,12000) g`);
+ await admin.unsafe('ANALYZE deckverse.rate_limit_counters');
+ const rows=await app.unsafe(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+   SELECT ctid FROM deckverse.rate_limit_counters
+   WHERE expires_at < statement_timestamp()
+   ORDER BY expires_at LIMIT 256 FOR UPDATE SKIP LOCKED`);
+ const plan=rows[0]['QUERY PLAN'][0];
+ const usedIndex=JSON.stringify(plan.Plan).includes('deckverse_rate_limit_expiry_idx');
+ console.log(JSON.stringify({scenario:'large-expiry-index',totalSeeded:12000,
+   expiredSeeded:1200,usedIndex,executionMs:plan['Execution Time']}));
+ assert.equal(usedIndex,true,'Expected expiry index for 12K rows and bounded expired-row lookup');
+});
+
 test('backend query failure is fail-closed; new connection retains counters',async()=>{
  const db=postgres(APP_URL,{max:1,prepare:false,ssl:false});
  await consumeQuota(db,{scope:'db-recovery',subject:'known-actor',max:1,seconds:3600});
