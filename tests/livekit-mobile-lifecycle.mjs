@@ -170,3 +170,11 @@ test('cancel during in-flight token fetch prevents a late room or media capture'
  assert.equal(MockRoom.instances.length,0);
  assert.equal(ctx.elements.get('call-join').disabled,false);
 });
+
+test('authorization errors do not reveal server text or start local media',async()=>{
+ const ctx = await setup(390, async () => ({ok:false,status:403,json:async()=>({error:'secret-token-not-for-display'})}));
+ await ctx.mod.connectCall(()=>({mode:'remote',code:'TEST12',token:'test'}));
+ assert.match(ctx.elements.get('call-status').textContent,/session expired/);
+ assert.doesNotMatch(ctx.elements.get('call-status').textContent,/secret-token/);
+ assert.equal(MockRoom.instances.length,0);
+});
