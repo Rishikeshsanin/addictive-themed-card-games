@@ -109,7 +109,7 @@ async function install() {
       PRIMARY KEY(room_id,seat)
     );
   `).simple();
-  for(const n of ['004_multiplayer_rooms.sql','005_deckverse_rate_limits.sql','006_deckverse_presence.sql']) {
+  for(const n of ['004_multiplayer_rooms.sql','005_deckverse_rate_limits.sql','006_deckverse_presence.sql','007_theme_rooms.sql']) {
     const code=readFileSync(new URL(`../migrations/${n}`,import.meta.url),'utf8');
     await db.unsafe(code).simple();
   }
@@ -132,13 +132,14 @@ try {
   await app.end({timeout:2});
   throw e;
 }
-test('006 migration applies twice, isolated DeckVerse schema and app role',async()=>{
+test('004-007 migrations apply in order, 006 reapplies, isolated DeckVerse schema and app role',async()=>{
   const [tables]=await db`select count(*)::int AS n from information_schema.tables
     where table_schema='deckverse' and table_name IN ('rooms','players','rate_limit_counters')`;
   assert.equal(tables.n,3);
   const columns=await db`select column_name from information_schema.columns
     where table_schema='deckverse' and table_name='rooms'`;
   for(const col of ['host_seat','presence_version'])assert.ok(columns.some(x=>x.column_name===col));
+  assert.ok(columns.some(x=>x.column_name==='theme_id'));
   const [role]=await app`select current_user as role`;
   assert.equal(role.role,'deckverse_app');
   const [rls]=await db`select relrowsecurity as rls from pg_class c

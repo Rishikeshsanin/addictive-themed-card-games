@@ -6,6 +6,7 @@ on:
       - "migrations/004_multiplayer_rooms.sql"
       - "migrations/005_deckverse_rate_limits.sql"
       - "migrations/006_deckverse_presence.sql"
+      - "migrations/007_theme_rooms.sql"
       - "tests/fixtures/pg17-v1-deckverse.sql"
       - ".github/workflows/db-postgres17-parity.yml"
       - "docs/V2_CI_PARITY_REVIEW.md"
@@ -53,7 +54,7 @@ jobs:
           test -s /tmp/deckverse-ci-pg17-v1.dump
 
           for pass in 1 2; do
-            for script in migrations/004_multiplayer_rooms.sql migrations/005_deckverse_rate_limits.sql migrations/006_deckverse_presence.sql; do
+            for script in migrations/004_multiplayer_rooms.sql migrations/005_deckverse_rate_limits.sql migrations/006_deckverse_presence.sql migrations/007_theme_rooms.sql; do
               echo "Applying $(basename "$script") (pass $pass) to synthetic PG17.6 ONLY"
               sql --single-transaction -f - < "$script"
             done
@@ -83,4 +84,4 @@ jobs:
           cols="$(docker exec "$CID" psql -U postgres -d restored_v1 -X -q -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM information_schema.columns WHERE table_schema='deckverse' AND table_name='rooms' AND column_name='player_count'")"
           test "$cols" = "0"
           rm -f /tmp/deckverse-ci-pg17-v1.dump
-          echo "PASS: PostgreSQL 17.6 synthetic V1 preservation, double 004/005/006 migration, 2P/3P capacity, RLS, pre-migration restore"
+          echo "PASS: PostgreSQL 17.6 synthetic V1 preservation, double 004/005/006/007 migration, 2P/3P capacity, immutable themes, RLS, pre-migration restore"

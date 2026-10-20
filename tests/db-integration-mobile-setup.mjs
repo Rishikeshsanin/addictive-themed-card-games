@@ -52,7 +52,7 @@ try {
  CONSTRAINT players_room_seat_unique UNIQUE(room_id,seat)
  )`);
  // Apply checked-in V2 migrations *only* to the CI database. Do not use Project Hub.
- for(const filename of ['004_multiplayer_rooms.sql','005_deckverse_rate_limits.sql','006_deckverse_presence.sql']){
+ for(const filename of ['004_multiplayer_rooms.sql','005_deckverse_rate_limits.sql','006_deckverse_presence.sql','007_theme_rooms.sql']){
   const sql=await readFile(new URL('../migrations/'+filename,import.meta.url),'utf8');
   assert.match(sql,/hub\.assert_app_scope\('deckverse'/,'Every migration must carry DeckVerse scope guard');
   assert.doesNotMatch(sql,/\b(?:DROP SCHEMA|TRUNCATE|CASCADE)\b/i,'No destructive migration shortcuts');
@@ -69,5 +69,5 @@ try {
  assert.equal(Number(check.multiplayer),1);
  assert.equal(Number(check.presence),1);
  assert.equal(Number(check.limiter),1);
- console.log('PASS: disposable V1 schema fixture + V2 004/005/006 application and contract');
+ console.log('PASS: disposable V1 schema fixture + V2 004/005/006/007 application and contract');
 } finally { await admin.end(); }

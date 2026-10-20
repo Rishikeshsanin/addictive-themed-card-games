@@ -10,7 +10,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const names=['004_multiplayer_rooms.sql','005_deckverse_rate_limits.sql','006_deckverse_presence.sql'];
+const names=['004_multiplayer_rooms.sql','005_deckverse_rate_limits.sql','006_deckverse_presence.sql','007_theme_rooms.sql'];
 const read=name=>readFileSync(path.join(root,'migrations',name),'utf8');
 const bins=()=>{
   let dirs=(process.env.PATH||'').split(path.delimiter);
@@ -25,7 +25,7 @@ function call(cmd,args,env={}){
   if(r.error||r.status!==0)throw Error(path.basename(cmd)+' failed: '+String(r.stderr||r.error?.message||r.stdout).slice(0,800));
   return r.stdout.trim();
 }
-test('004-006 are read-only audited for obvious out-of-scope DDL and expected objects',()=>{
+test('004-007 are read-only audited for obvious out-of-scope DDL and expected objects',()=>{
   for(const n of names){
     const s=read(n);
     assert.match(s,/SELECT hub\.assert_app_scope\(\s*'deckverse'\s*,\s*'deckverse'\s*\)/i);
@@ -92,7 +92,7 @@ test('004->005->006 apply and rerun against disposable PostgreSQL preserving leg
       sql("SET ROLE deckverse_app; INSERT INTO deckverse.rate_limit_counters(scope,key_hash,window_start,expires_at) VALUES ('join',repeat('f',64),now(),now()+interval '15 minutes'); RESET ROLE;");
       assert.equal(sql("SELECT hits FROM deckverse.rate_limit_counters WHERE scope='join'"),'1');
       assert.equal(sql(digest),before);
-      console.log('PASS: disposable PostgreSQL; 004/005/006 twice, data hash stable, grants/RLS, seat bounds and app-role insert');
+      console.log('PASS: disposable PostgreSQL; 004/005/006/007 twice, data hash stable, grants/RLS, seat bounds and app-role insert');
     }finally{
       if(running)try{call(ctl,['-D',dbdir,'-m','immediate','-w','stop'])}catch{}
       rmSync(work,{recursive:true,force:true});

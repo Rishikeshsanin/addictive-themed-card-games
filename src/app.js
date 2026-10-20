@@ -2,11 +2,14 @@ import {STAT_FIELDS,DECKS,deckFor,card,art} from './catalog.js';
 import {newGame,takeTurn,viewFor,secureIndex} from './engine.js';
 import {initCallControls,disconnectCall,getCallAvailability} from './livekit-call.js';
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let screen='landing',mode='same',roomSize=2,session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
+let screen='landing',mode='same',roomSize=2,selectedThemeId='pokemon',session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
 let pollBusy=false,actionBusy=false,readyBusy=false,pollTimer=null,revealTimer=null,renderKey='',lobbySnapshot=null,callHealthChecked=false;
 let pollEpoch=0,pollDelay=0,networkState='connected',heartbeatTimer=null,heartbeatBusy=false;
 function networkStatus(state){if(networkState===state)return;networkState=state;const box=$('network-status');if(!box)return;box.classList.toggle('hidden',state==='connected');box.textContent=state==='offline'?'OFFLINE · Your room is preserved. Reconnect to continue.':'RECONNECTING · Your cards and room remain safe.';renderKey='';if(screen==='battle'&&game)renderBattle();}
-const symbols={rank:'♛',height:'↕',weight:'◆',attack:'⚔',defense:'⬡',speed:'⚡',energy:'✧',hp:'♥'};
+const symbols={rank:'♛',height:'↕',weight:'◆',attack:'⚔',defense:'⬡',speed:'⚡',energy:'✧',hp:'♥',strength:'◆',combat:'⚔',intellect:'◈',endurance:'♥',durability:'⬡',technology:'⌁',versatility:'✦',mischief:'✹',comedy:'☺',courage:'♜',imagination:'✧',friendship:'♡',luck:'☘',chakra:'◎',taijutsu:'⚔',ninjutsu:'✦',genjutsu:'◉',strategy:'♟',batting:'🏏',bowling:'●',fielding:'◇',leadership:'♛',clutch:'✦',consistency:'═',athleticism:'⚡',might:'◆',agility:'↝',magic:'✧',wisdom:'◈',stamina:'♥'};
+const themeMeta={
+ pokemon:{name:'Pokémon',icon:'⚡'},avengers:{name:'Avengers Saga',icon:'✦'},ben10:{name:'Ben 10 Alien Clash',icon:'◎'},shinchan:{name:'Shin-chan Chaos',icon:'✹'},dc:{name:'DC Legends',icon:'◆'},naruto:{name:'Naruto Shinobi Clash',icon:'◉'},cricket:{name:'Cricket Legends',icon:'🏏'},fantasy:{name:'Elemental Realms',icon:'🐉'}
+};
 const elements=['landing','setup','lobby','battle'];
 function show(id){screen=id;for(const el of elements)$(el).classList.toggle('hidden',el!==id);if(id!=='landing')window.scrollTo(0,0);if(id==='landing')location.hash='';if(id==='setup')checkRoomHealth();}
 let toastTimer;
@@ -14,7 +17,24 @@ function toast(text){$('toast').textContent=text;$('toast').classList.remove('hi
 function displayName(){return ($('player-name').value.trim()||localStorage.getItem('deckverse_name')||'Player').slice(0,24)}
 function saveName(){localStorage.setItem('deckverse_name',displayName())}
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
-function pokemonCard(c,chosen=''){if(!c)return '<div class="card-back"><span>✦</span></div>';const vals=STAT_FIELDS.map(s=>'<div class="card-bar '+(s.key===chosen?'best':'')+'"><span>'+symbols[s.key]+' '+(s.key==='energy'?'ENERGY':s.name)+'</span><b>'+Number(c[s.key]).toLocaleString(undefined,{maximumFractionDigits:2})+'</b></div>').join('');return '<div class="card-top"><span>NO. '+String(c.id).padStart(3,'0')+'</span><span>THE ORIGINALS</span></div><div class="card-art"><img src="'+art(c.id)+'" alt="" loading="eager" onerror="this.style.display=\'none\'"/></div><div class="card-name">'+escapeHtml(c.name.toUpperCase())+'</div><div class="card-bars">'+vals+'</div>'}
+const activeThemeId=()=>practice?'pokemon':lobbySnapshot?.room?.themeId||session?.themeId||selectedThemeId;
+const activeTheme=()=>themeMeta[activeThemeId()]||themeMeta.pokemon;
+const categories=()=>practice||!lobbySnapshot?.room?.theme?.categories?STAT_FIELDS:lobbySnapshot.room.theme.categories;
+const statValue=(c,key)=>c?.stats?.[key]??c?.[key];
+const resolvedCard=c=>!c?null:(c.stats?c:(activeThemeId()==='pokemon'?card(c.id):c));
+function pokemonCard(raw,chosen=''){
+ const c=resolvedCard(raw);if(!c)return '<div class="card-back"><span>'+escapeHtml(activeTheme().icon)+'</span></div>';
+ const vals=categories().map(s=>'<div class="card-bar '+(s.key===chosen?'best':'')+'"><span>'+(symbols[s.key]||'✦')+' '+escapeHtml(s.name)+'</span><b>'+Number(statValue(c,s.key)).toLocaleString(undefined,{maximumFractionDigits:2})+'</b></div>').join('');
+ const visual=activeThemeId()==='pokemon'?'<img src="'+art(c.id)+'" alt="" loading="eager" onerror="this.style.display=\'none\'"/>':'<div class="theme-card-sigil" aria-hidden="true">'+escapeHtml(activeTheme().icon)+'</div>';
+ return '<div class="card-top"><span>NO. '+String(c.id).padStart(3,'0')+'</span><span>'+escapeHtml(activeTheme().name.toUpperCase())+'</span></div><div class="card-art theme-'+escapeHtml(activeThemeId())+'">'+visual+'</div><div class="card-name">'+escapeHtml(c.name.toUpperCase())+'</div><div class="card-bars">'+vals+'</div>'
+}
+function selectTheme(id,{open=false}={}){
+ if(!themeMeta[id])return;selectedThemeId=id;
+ document.querySelectorAll('[data-theme-id]').forEach(button=>{const selected=button.dataset.themeId===id;button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));});
+ const meta=themeMeta[id],name=$('selected-theme-name'),icon=$('selected-theme-icon');if(name)name.textContent=meta.name.toUpperCase();if(icon)icon.textContent=meta.icon;
+ $('practice-btn').textContent=id==='pokemon'?'⚡ TRY A SOLO PRACTICE MATCH ↗':'⚡ TRY POKÉMON SOLO PRACTICE ↗';
+ if(open)setupScreen();
+}
 async function checkRoomHealth(){
  const message=$('room-availability'),create=$('create-room'),join=$('join-room');
  if(!message||!create||!join)return;
@@ -34,11 +54,18 @@ function stopPolling(){pollEpoch++;clearInterval(poll);poll=null;clearTimeout(po
 function resetReveal(){clearTimeout(revealTimer);revealTimer=null;renderKey='';$('result').classList.add('hidden');}
 function setupScreen(){stopPolling();clearTimeout(botTimer);resetReveal();disconnectCall();callHealthChecked=false;practice=null;session=null;lobbySnapshot=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
 function init(){
+ const battleLabels=document.querySelectorAll('.tabletop .battle-label');if(battleLabels[0])battleLabels[0].id='my-card-label';if(battleLabels[1])battleLabels[1].id='their-card-label';
+ const battleTheme=document.querySelector('.battle-logo small');if(battleTheme)battleTheme.id='battle-theme-name';
+ const revealCopy=document.querySelector('.reveal-settings>p');if(revealCopy)revealCopy.textContent='All played cards stay face up after each round. Choose how long before the next move.';
+ const battleManual=$('battle-reveal-setting')?.querySelector('[value="manual-2"]');if(battleManual)battleManual.textContent='Manual · every player presses Continue';
+ const setupIntro=document.querySelector('.setup-intro');if(setupIntro){const chosen=document.createElement('div');chosen.className='selected-theme';chosen.innerHTML='<span id="selected-theme-icon">⚡</span><small>SELECTED DECK</small><strong id="selected-theme-name">POKÉMON</strong>';setupIntro.querySelector('.setup-visual')?.before(chosen)}
+ const lobbyHeading=document.querySelector('.lobby-wrap .eyebrow');if(lobbyHeading){const badge=document.createElement('span');badge.id='lobby-theme';badge.className='lobby-theme';lobbyHeading.after(badge)}
  window.addEventListener('online',()=>{if(session){networkStatus('reconnecting');beginPolling()}});
  window.addEventListener('offline',()=>{if(session)networkStatus('offline')});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session)beginPolling()});
  $('player-name').value=localStorage.getItem('deckverse_name')||'';
- for(const b of ['top-play','hero-play','pokemon-tile'])$(b).addEventListener('click',setupScreen);
+ for(const b of ['top-play','hero-play'])$(b).addEventListener('click',setupScreen);
+ document.querySelectorAll('[data-theme-id]').forEach(button=>button.addEventListener('click',()=>selectTheme(button.dataset.themeId,{open:true})));
  $('hero-how').addEventListener('click',()=>document.querySelector('#how').scrollIntoView({behavior:'smooth'}));
  $('setup-back').addEventListener('click',()=>show('landing'));
  document.querySelectorAll('.mode-card').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('.mode-card').forEach(n=>n.classList.toggle('selected',n===b))}));
@@ -67,15 +94,16 @@ function init(){
   event.target.disabled=false;
  };
  $('join-code').addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)});
- $('player-name').addEventListener('keydown',e=>{if(e.key==='Enter')$('create-room').click()});
+ $('player-name').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)$('create-room').click()});
  if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
  const room=new URLSearchParams(location.search).get('room');if(room&&/^[a-z0-9]{6}$/i.test(room)){$('join-code').value=room.toUpperCase();mode='remote';document.querySelector('[data-mode="remote"]').click();show('setup');toast('YOU HAVE AN INVITE — ENTER YOUR NAME TO JOIN')}
- try{const saved=JSON.parse(sessionStorage.getItem('deckverse_session')||'null');if(saved?.code&&saved?.token){session=saved;beginPolling();}}catch{}
+ selectTheme(selectedThemeId);
+ try{const saved=JSON.parse(sessionStorage.getItem('deckverse_session')||'null');if(saved?.code&&saved?.token){session=saved;selectedThemeId=saved.themeId||'pokemon';beginPolling();}}catch{}
 }
 function startPractice(){saveName();stopPolling();resetReveal();disconnectCall();callHealthChecked=false;session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
 const API='/api/game';
 async function api(action,body={}){let response;try{response=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})})}catch{throw Error('Cannot connect to the game server. Check your internet connection.')};const data=await response.json().catch(()=>({error:'Unexpected server response'}));if(!response.ok||data.error)throw Error(data.error||'Room request failed');return data}
-async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code,playerCount:roomSize});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
+async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code,playerCount:roomSize,...(action==='create'?{themeId:selectedThemeId}:{})});session={code:data.room.code,token:data.token,mode:data.room.mode,themeId:data.room.themeId,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
 async function roomAction(action,params={}){
  if(!session||actionBusy)return false;
  actionBusy=true;
@@ -96,10 +124,11 @@ async function toggleReady(){
 }
 function updateRoom(data){
  if(!session||data.error)return;
- session.me=data.me;session.mode=data.room.mode;session.players=data.players;
+ const themeId=data.room.themeId||'pokemon';data.room={...data.room,themeId,theme:data.room.theme||{name:themeMeta[themeId]?.name||'Pokémon',categories:STAT_FIELDS}};
+ session.me=data.me;session.mode=data.room.mode;session.themeId=themeId;session.players=data.players;selectedThemeId=themeId;
  game=data.game||null;
  lobbySnapshot=data;
- sessionStorage.setItem('deckverse_session',JSON.stringify({code:session.code,token:session.token,mode:session.mode,me:session.me}));
+ sessionStorage.setItem('deckverse_session',JSON.stringify({code:session.code,token:session.token,mode:session.mode,themeId:session.themeId,me:session.me}));
  if(data.room.status==='lobby'){if(screen!=='lobby')show('lobby');renderLobby(data);return}
  if(data.room.status==='playing'||data.room.status==='finished'){
   if(screen!=='battle'){show('battle');resetReveal();callHealthChecked=false;}
@@ -109,6 +138,7 @@ function updateRoom(data){
 function renderLobby(data){
  if(!data?.room||!session)return;
  $('room-code').textContent=data.room.code;
+ if($('lobby-theme'))$('lobby-theme').textContent=(themeMeta[data.room.themeId]?.icon||'✦')+' '+data.room.theme.name.toUpperCase();
  const people=data.players||[],count=data.room.playerCount||2;
  $('lobby-players').innerHTML=Array.from({length:count},(_,i)=>i).map(i=>{const p=people.find(x=>x.index===i);return '<div class="player-slot"><span>'+(p?(i===0?'⚡':'🔥'):'◇')+'</span><strong>'+escapeHtml(p?.name||'WAITING FOR RIVAL')+'</strong><small>'+(p?(p.ready?'● READY':'○ NOT READY'):'INVITE SOMEONE TO JOIN')+'</small></div>'}).join('');
  $('lobby-message').textContent=people.length<count?'Share the invite link: '+people.length+'/'+count+' players joined.':people.every(x=>x.ready)?'Everyone is ready. Let the battle begin!':'Waiting for all players to get ready…';
@@ -200,7 +230,7 @@ function showMultiRoundResult(last,me){
  const title=tie?'THE CARDS GO TO THE JACKPOT':ownWin?'YOU WON THE ROUND!':winner===null?'ROUND RESOLVED':escapeHtml(playerName(winner))+' WINS THE ROUND!';
  const detail=tie?'All played cards are held aside.':last.kind==='sudden-death'?'Rank settled the exhausted-deck tie.':last.kind==='last-standing'?'Only one player had cards left after the tie.':'Cards move to the winning deck.';
  const rows=last.cards.map((played,i)=>{
-  const character=card(played.id);
+  const character=resolvedCard(played);
   return '<span>'+escapeHtml(playerName(played.seat))+' · '+escapeHtml(character?.name||'CARD')+' <b>'+Number(last.values[i]).toLocaleString(undefined,{maximumFractionDigits:2})+'</b></span>';
  }).join('');
  const manual=game.reveal?.mode==='manual',acked=game.reveal?.acks?.includes(me);
@@ -223,7 +253,7 @@ function renderMultiBattle(){
  $('round-number').textContent=String(game.round+(active||ended?0:1)).padStart(2,'0');
  $('multi-arena').innerHTML=Array.from({length:count},(_,seat)=>{
   const played=active?last?.cards?.find(x=>x.seat===seat):null;
-  const character=played?card(played.id):seat===me?game.topCard:null;
+  const character=played?resolvedCard(played):seat===me?game.topCard:null;
   const outOfCards=game.counts[seat]===0&&!played;
   return '<div class="multi-player '+(seat===me?'mine':'')+'"><div class="multi-player-heading"><span>'+escapeHtml(playerName(seat))+(seat===me?' (YOU)':'')+'</span><small>'+game.counts[seat]+' CARDS'+(outOfCards?' · OUT':'')+'</small></div><div class="battle-card multi-card">'+pokemonCard(character,active&&played?last.stat:'')+'</div></div>';
  }).join('');
@@ -233,7 +263,7 @@ function renderMultiBattle(){
  $('turn-power').textContent=active?'✦ REVIEW THE ROUND':ended?'✦ FINAL RESULT':game.chooser===me?'✦ YOU HAVE THE POWER':'⌛ '+playerName(game.chooser).toUpperCase()+' IS CHOOSING';
  $('controls-title').textContent=ended?'THE SHOWDOWN IS OVER.':active?'EVERY PLAYER SEES THE SAME CARDS.':game.chooser===me?'PICK YOUR WINNING STAT.':'WAIT FOR THE CATEGORY CALL.';
  $('control-subtitle').textContent=active?'The next turn unlocks after the shared reveal.':ended?'See the result above.':'Rank is the only category where lower wins.';
- $('stat-buttons').innerHTML=STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(game.topCard?Number(game.topCard[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
+ $('stat-buttons').innerHTML=categories().map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+(symbols[s.key]||'✦')+' '+escapeHtml(s.name)+'</span><b>'+(game.topCard?Number(statValue(game.topCard,s.key)).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
  $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>play(b.dataset.stat));
  $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
  $('call-dock').classList.toggle('hidden',session?.mode!=='remote');
@@ -250,6 +280,9 @@ function renderMultiBattle(){
 }
 function renderBattle(){
  if(!game)return;
+ $('battle-theme-name').textContent=activeTheme().name.toUpperCase();
+ $('my-card-label').textContent='YOUR '+(activeThemeId()==='pokemon'?'POKÉMON':'CARD');
+ $('their-card-label').textContent="RIVAL'S "+(activeThemeId()==='pokemon'?'POKÉMON':'CARD');
  if(!practice&&game.playerCount>2){renderMultiBattle();return;}
  document.querySelector('#battle .battle-meta').classList.remove('hidden');
  document.querySelector('#battle .tabletop').classList.remove('hidden');
@@ -263,8 +296,8 @@ function renderBattle(){
  $('you-name').textContent=playerName(me).toUpperCase();$('enemy-name').textContent=playerName(enemy).toUpperCase();
  $('you-count').textContent=game.counts[me];$('enemy-count').textContent=game.counts[enemy];
  const last=game.last,showLast=active&&last?.cards?.length===2;
- const myShown=showLast?card(last.cards[me].id):own;
- const theirShown=showLast?card(last.cards[enemy].id):null;
+ const myShown=showLast?resolvedCard(last.cards[me]):own;
+ const theirShown=showLast?resolvedCard(last.cards[enemy]):null;
  $('my-card').innerHTML=pokemonCard(myShown,showLast?last.stat:'');
  $('their-card').innerHTML=theirShown?pokemonCard(theirShown,last.stat):'<div class="card-back"><span>✦</span></div>';
  const chooser=game.chooser===me;
@@ -272,9 +305,9 @@ function renderBattle(){
  const canPlay=!active&&!ended&&!paused&&chooser&&!actionBusy&&(practice||networkState==='connected');
  $('battle-status').textContent=paused&&!ended?'PAUSED · WAITING FOR RECONNECTION':active?'BOTH CARDS REVEALED':ended?(game.winner===me?'MATCH WON':'MATCH OVER'):chooser?'YOUR TURN TO CHOOSE':'WAITING ON YOUR RIVAL';
  $('turn-power').textContent=active?'✦ REVIEW YOUR LAST BATTLE':ended?'✦ MATCH COMPLETE':chooser?'✦ YOU HAVE THE POWER':'⌛ YOUR RIVAL HAS THE POWER';
- $('controls-title').textContent=active?'REVIEW THE TWO POKÉMON.':ended?'THE SHOWDOWN IS OVER.':chooser?'THE NEXT MOVE IS YOURS.':'HOLD TIGHT. NEXT CARD IS COMING.';
+ $('controls-title').textContent=active?'REVIEW THE TWO CARDS.':ended?'THE SHOWDOWN IS OVER.':chooser?'THE NEXT MOVE IS YOURS.':'HOLD TIGHT. NEXT CARD IS COMING.';
  $('control-subtitle').textContent=active?'The next category unlocks after both have seen the result.':ended?'See the final result above.':chooser?'Choose the category you think will win.':'Your rival is choosing a category.';
- $('stat-buttons').innerHTML=STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(own?Number(own[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
+ $('stat-buttons').innerHTML=categories().map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+(symbols[s.key]||'✦')+' '+escapeHtml(s.name)+'</span><b>'+(own?Number(statValue(own,s.key)).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
  $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.stat)));
  $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE TIE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
  $('call-dock').classList.toggle('hidden',!session||session.mode!=='remote');
@@ -314,7 +347,7 @@ function showFinalResult(me){
 function showRoundResult(last,me){
  if(!last?.cards?.length)return;
  const enemy=1-me,tie=last.kind==='tie',win=last.winner===me;
- const mine=card(last.cards[me].id),theirs=card(last.cards[enemy].id);
+ const mine=resolvedCard(last.cards[me]),theirs=resolvedCard(last.cards[enemy]);
  const showNumber=x=>Number(x).toLocaleString(undefined,{maximumFractionDigits:2});
  const title=tie?'IT’S A TIE!':win?'YOU WON THIS ROUND!':'YOUR RIVAL WON THIS ROUND';
  const details=tie?'Both cards move to the jackpot.':win?'You collect both cards'+(last.awarded?.length>2?' and the jackpot.':'.'):'Your rival collects both cards'+(last.awarded?.length>2?' and the jackpot.':'.');

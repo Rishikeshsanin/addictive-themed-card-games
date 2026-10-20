@@ -11,6 +11,7 @@ import postgres from 'postgres';
 import {DECKS,card,STAT_FIELDS} from '../src/catalog.js';
 import {validateMulti} from '../src/multi-engine.js';
 import {validate} from '../src/engine.js';
+import {ALLOWED_THEME_IDS,DECK_SIZE_BY_PLAYERS,getServerTheme} from '../src/server/theme-registry.js';
 
 const URL=process.env.DECKVERSE_DATABASE_URL||'';
 const FIXTURE=process.env.DB_MULTIPLAYER_FIXTURE_URL||'';
@@ -42,12 +43,40 @@ const rejected=async(action,data,ip,code=409)=>{
  assert.equal(result.status,code,action+' unexpectedly accepted: '+JSON.stringify(result));
  return result;
 };
-async function createRoom(n,{manual=false,defaultCount=false}={}){
+async function createRoom(n,{manual=false,defaultCount=false,themeId='pokemon'}={}){
  const ip=newIP();
- const host=await good('create',{name:'QA Host '+n,mode:'same',...(defaultCount?{}:{playerCount:n})},ip);
+ const host=await good('create',{name:'QA Host '+n,mode:'same',themeId,...(defaultCount?{}:{playerCount:n})},ip);
  assert.equal(host.room.playerCount,n);
  if(manual)await good('settings',{code:host.room.code,token:host.token,mode:'manual',seconds:2},ip);
  return {code:host.room.code,n,members:[{seat:0,token:host.token,ip}],host};
+}
+async function themeRoomMatrix(){
+ for(const themeId of ALLOWED_THEME_IDS)for(const n of [2,3,4]){
+  const r=await createRoom(n,{themeId});await fillRoom(r);
+  const lobby=await good('get',auth(r),r.members[0].ip);
+  assert.equal(lobby.room.themeId,themeId);assert.equal(lobby.room.theme.name,getServerTheme(themeId).name);
+  assert.deepEqual(lobby.room.theme.categories,getServerTheme(themeId).categories);
+  assert.equal(lobby.room.playerCount,n);
+  const mutation=await invoke('ready',{...auth(r),ready:true,themeId:themeId==='pokemon'?'dc':'pokemon'},r.members[0].ip);
+  assert.equal(mutation.status,409,'room theme must be immutable');
+  const started=await readyAndStart(r);
+  assert.equal(started.room.themeId,themeId);assert.equal(started.game.total,DECK_SIZE_BY_PLAYERS[n]);
+  assert.ok(started.game.topCard,'authenticated player sees only their top card');
+  assert.equal(started.game.players,undefined);assert.ok(!JSON.stringify(started.game).includes('"deck"'));
+  const chooser=started.game.chooser,category=started.room.theme.categories.find(x=>x.key!=='rank')?.key||'rank';
+  const invalid=await invoke('select',{...auth(r,chooser),stat:'not_a_real_category',expectedRound:0},r.members[chooser].ip);
+  assert.equal(invalid.status,400,'invalid theme category must be rejected');
+  const after=await good('select',{...auth(r,chooser),stat:category,expectedRound:0},r.members[chooser].ip);
+  assert.equal(after.game.round,1);assert.equal(after.game.last.cards.length,n);
+  for(const member of r.members){const view=await good('get',auth(r,member.seat),member.ip);assert.equal(view.game.last.cards.length,n);assert.ok(!JSON.stringify(view.game).includes('"deck"'));}
+  const stored=await row(r),finished=stored.state;finished.status='finished';finished.winner=0;
+  await fixture`update deckverse.rooms set state=${fixture.json(finished)},status='finished',reveal_until=null,reveal_acks='[]'::jsonb where id=${stored.id}`;
+  let rematched;
+  for(const member of r.members)rematched=await good('rematch',{...auth(r,member.seat),expectedMatchNumber:1},member.ip);
+  assert.equal(rematched.room.themeId,themeId);assert.equal(rematched.game.matchNumber,2);
+  assert.equal(rematched.game.total,DECK_SIZE_BY_PLAYERS[n]);assert.equal(rematched.game.round,0);
+  console.log('PASS THEME MATRIX '+themeId+' '+n+'P');
+ }
 }
 async function fillRoom(r){
  for(let i=1;i<r.n;i++){
@@ -383,6 +412,7 @@ try{
   where conrelid='deckverse.players'::regclass and conname='players_seat_check'`;
  assert.match(seatRule.definition,/3/,'004 must permit 4-player seat index 3');
  for(const n of [2,3,4])await suite(n);
+ await themeRoomMatrix();
  for(const n of [2,3,4])await manual(n);
  await joinRace();
  await forfeit(2);await forfeit(4);
@@ -390,8 +420,8 @@ try{
  for(const n of [2,3,4])await exhaustedSuddenDeath(n);
  for(const n of [2,3,4])await organic(n);
  const summary={kind:'real-postgresql-local-ci',time:new Date().toISOString(),
-  migration:'Disposable legacy fixture expanded using 004,005,006; hub.assert_app_scope is test-only stub',
-  suites:'2P/3P/4P transactional API, manual/auto, chained multiway pots, elimination rotation, exhaustion, duplicate rematches, race, forfeit, organic completion',
+  migration:'Disposable legacy fixture expanded using 004,005,006,007; hub.assert_app_scope is test-only stub',
+  suites:'All 8 themes across 2P/3P/4P plus transactional API, privacy, invalid categories, immutable themes, manual/auto, chained pots, elimination, exhaustion, rematches, races, forfeit and organic completion',
   coordinatorBlockers:[...new Set(errors)],
   latencyMs:Object.fromEntries(Object.entries(records).map(([k,v])=>[k,{calls:v.length,p50:percentile(v,0.5),p95:percentile(v,.95),max:Math.max(...v)}]))};
  await fs.writeFile('/tmp/deckverse-db-multiplayer-results.json',JSON.stringify(summary,null,2));

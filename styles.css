@@ -163,6 +163,29 @@ html,body,#app{max-width:100%;overflow-x:clip}
 #call-audio{background:#caff58!important;color:#151525!important;font-size:10px!important;letter-spacing:.02em}
 #call-audio:focus-visible{outline:2px solid #fff;outline-offset:2px}
 
+/* Eight-theme multiplayer extends the established DeckVerse card language. */
+.theme-grid.eight-themes{grid-template-columns:repeat(4,minmax(0,1fr))}
+.eight-themes .pokemon-theme{grid-column:span 2}
+.eight-themes .theme-card{min-height:285px}
+.live-theme{background:radial-gradient(circle at 72% 22%,#815cc055,transparent 42%),linear-gradient(145deg,#27203f,#17182b);cursor:pointer}
+.live-theme-icon{position:absolute;right:18px;top:12px;font-size:82px;opacity:.18;filter:drop-shadow(0 12px 18px #0008)}
+.live-theme .theme-content h3{font-size:21px;line-height:1.08}
+.live-theme.avengers{background:radial-gradient(circle at 75% 20%,#d8913b66,transparent 45%),#231d35}
+.live-theme.ben10{background:radial-gradient(circle at 75% 20%,#66cf6966,transparent 45%),#152b25}
+.live-theme.shinchan{background:radial-gradient(circle at 75% 20%,#f2765566,transparent 45%),#332026}
+.live-theme.dc{background:radial-gradient(circle at 75% 20%,#7770e766,transparent 45%),#171c36}
+.live-theme.naruto{background:radial-gradient(circle at 75% 20%,#ec843e66,transparent 45%),#30201d}
+.live-theme.cricket{background:radial-gradient(circle at 75% 20%,#43b78166,transparent 45%),#172a27}
+.live-theme.fantasy{background:radial-gradient(circle at 75% 20%,#bd58cc66,transparent 45%),#2d1837}
+.theme-card.selected{border-color:var(--lime);box-shadow:0 0 0 1px #caff5855,0 14px 38px #0005}
+.selected-theme{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;align-items:center;width:max-content;max-width:100%;margin:24px 0 0;padding:12px 16px;border:1px solid #caff5855;border-radius:11px;background:#caff580d}
+.selected-theme>span{grid-row:span 2;font-size:27px}.selected-theme small{font-size:8px;letter-spacing:1.4px;color:#9f98b5}.selected-theme strong{font-size:13px;color:var(--lime)}
+.lobby-theme{display:inline-flex;margin-top:13px;padding:7px 11px;border:1px solid #caff5844;border-radius:999px;color:var(--lime);font-size:10px;font-weight:800;letter-spacing:1px}
+.theme-card-sigil{font-size:92px;opacity:.72;filter:drop-shadow(0 18px 20px #0008)}
+.card-art.theme-avengers{background:radial-gradient(circle,#9c683c88,transparent 68%)}.card-art.theme-ben10{background:radial-gradient(circle,#5ba75d88,transparent 68%)}.card-art.theme-shinchan{background:radial-gradient(circle,#b85e5288,transparent 68%)}.card-art.theme-dc{background:radial-gradient(circle,#615da688,transparent 68%)}.card-art.theme-naruto{background:radial-gradient(circle,#ba653f88,transparent 68%)}.card-art.theme-cricket{background:radial-gradient(circle,#38896788,transparent 68%)}.card-art.theme-fantasy{background:radial-gradient(circle,#884b9d88,transparent 68%)}
+@media(max-width:1040px){.theme-grid.eight-themes{grid-template-columns:repeat(3,minmax(0,1fr))}.eight-themes .theme-card:last-child{grid-column:auto;min-height:285px}}
+@media(max-width:700px){.theme-grid.eight-themes{grid-template-columns:repeat(2,minmax(0,1fr))}.eight-themes .pokemon-theme{grid-column:span 2}.eight-themes .theme-card{min-height:225px}.live-theme .theme-content h3{font-size:15px}.live-theme .theme-content p{font-size:9px;line-height:1.4}.live-theme-icon{font-size:58px}.selected-theme{margin-top:14px}.theme-card-sigil{font-size:62px}}
+
 /* Codex V1.2 accessibility hardening retained in V2 */
 button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
 .stat-button{min-height:44px}
