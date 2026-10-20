@@ -31,18 +31,47 @@ export class RateLimitError extends Error {
 function normalizeIP(value) {
   if(typeof value!=='string')return null;
   const ip=value.trim();
-  // Never choose a client-controlled element of a forwarding chain.
+  // Never select the leftmost/first address in a client-provided proxy chain.
   if(!ip||ip.includes(',')||ip.includes('%')||ip.length>64)return null;
-  return isIP(ip)?ip.toLowerCase():null;
+  if(isIP(ip)===4)return ip;
+  if(isIP(ip)!==6)return null;
+  // Canonicalize equivalent IPv6 spellings before hashing them into a quota key.
+  // URL hostname follows the WHATWG IPv6 canonicalization algorithm.
+  try {
+    const canonical=new URL(`http://[${ip}]/`).hostname.slice(1,-1);
+    // Node/Vercel can represent the same IPv4 visitor as an IPv4-mapped IPv6
+    // address. Keep both forms in the same durable bucket.
+    const mapped=/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(canonical);
+    if(mapped){
+      const hi=parseInt(mapped[1],16),lo=parseInt(mapped[2],16);
+      return [hi>>>8,hi&255,lo>>>8,lo&255].join('.');
+    }
+    return canonical;
+  }catch{return null;}
 }
 
-/** Only trust Vercel-owned forwarding headers when the server itself runs on Vercel. */
+/**
+ * On Vercel, x-forwarded-for is explicitly overwritten by Vercel's proxy.
+ * See https://vercel.com/docs/headers/request-headers#x-forwarded-for
+ * Do NOT use x-vercel-forwarded-for (its overwrite guarantee is less explicit)
+ * or user-supplied Forwarded / x-real-ip / custom edge headers here.
+ * Outside Vercel use only the direct socket IP. The VERCEL flag itself must be
+ * set by the trusted deployment, never by request input.
+ */
 export function getClientIP(req, {vercel=process.env.VERCEL==='1'}={}) {
-  if(vercel) {
-    const raw=req?.headers?.['x-vercel-forwarded-for'];
-    return normalizeIP(Array.isArray(raw)?null:raw);
+  if(!vercel)return normalizeIP(req?.socket?.remoteAddress);
+  // A duplicate forwarding header may have been merged or added by an upstream
+  // proxy. Refuse ambiguity rather than trusting an attacker-chosen element.
+  if(Array.isArray(req?.rawHeaders)){
+    let found=0;
+    for(let i=0;i<req.rawHeaders.length;i+=2){
+      if(typeof req.rawHeaders[i]==='string'&&
+        req.rawHeaders[i].toLowerCase()==='x-forwarded-for')found++;
+    }
+    if(found>1)return null;
   }
-  return normalizeIP(req?.socket?.remoteAddress);
+  const raw=req?.headers?.['x-forwarded-for'];
+  return normalizeIP(Array.isArray(raw)?null:raw);
 }
 
 const digest=material=>createHash('sha256').update(`deckverse-rate-limit-v2\0${material}`).digest('hex');

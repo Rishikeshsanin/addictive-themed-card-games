@@ -179,21 +179,26 @@ test('shared household IP allows four players polling, refresh and reconnect',as
   p50Ms:percentile(samples,.5),p95Ms:percentile(samples,.95)}));
 });
 
-test('spoofed forwarding chains and missing trusted identity never bypass quotas',async()=>{
- const req=ip('192.0.2.42',{'x-forwarded-for':'8.8.8.8','x-vercel-forwarded-for':'203.0.113.20'});
- assert.equal(getClientIP(req,{vercel:false}),'192.0.2.42');
- assert.equal(getClientIP(req,{vercel:true}),'203.0.113.20');
- assert.equal(getClientIP({...req,headers:{'x-vercel-forwarded-for':'8.8.8.8, 9.9.9.9'}},{vercel:true}),null);
+test('spoofed forwarding chains, IPv6 aliases and missing trusted IP never bypass durable quotas',async()=>{
+ const request=ip('192.0.2.42',{'x-forwarded-for':'203.0.113.20','x-vercel-forwarded-for':'8.8.8.8'});
+ assert.equal(getClientIP(request,{vercel:false}),'192.0.2.42');
+ assert.equal(getClientIP(request,{vercel:true}),'203.0.113.20');
+ assert.equal(getClientIP({...request,headers:{'x-vercel-forwarded-for':'8.8.8.8'}},{vercel:true}),null);
+ assert.equal(getClientIP({...request,headers:{'x-forwarded-for':'8.8.8.8, 9.9.9.9'}},{vercel:true}),null);
+ const duplicate={...request,rawHeaders:['X-Forwarded-For','203.0.113.20','x-forwarded-for','8.8.8.8']};
+ assert.equal(getClientIP(duplicate,{vercel:true}),null);
  const unknown=ip('untrusted',{'x-forwarded-for':'192.0.2.41'});
  await allowed(()=>enforceRateLimit(app,unknown,{route:'game',action:'create'},fixed),3);
  await rejected(()=>enforceRateLimit(app,unknown,{route:'game',action:'create'},fixed),'create-10m');
- const vhost=ip('192.0.2.50',{'x-vercel-forwarded-for':'2001:db8::beef'});
- await enforceRateLimit(app,vhost,{route:'game',action:'create'},
-   {vercel:true,cleanupChance:0});
- const [s]=await app`SELECT count(*)::int AS n FROM deckverse.rate_limit_counters
-   WHERE scope='create-10m' AND hits>=1`;
- assert.ok(s.n>=3);
- console.log('DB identity: untrusted x-forwarded-for ignored; Vercel-only single header used; malformed/missing IP shared fallback capped at 3 creates');
+ const vhost=ip('192.0.2.50',{'x-forwarded-for':'2001:db8::beef'});
+ await enforceRateLimit(app,vhost,{route:'game',action:'create'},{vercel:true,cleanupChance:0});
+ const ipAlias=ip('2001:0DB8:0000:0:0::ce');
+ await allowed(()=>enforceRateLimit(app,ipAlias,{route:'game',action:'create'},fixed),8);
+ await rejected(()=>enforceRateLimit(app,ip('2001:db8::ce'),{route:'game',action:'create'},fixed),'create-10m');
+ const mapped=ip('::ffff:198.51.100.211');
+ await allowed(()=>enforceRateLimit(app,mapped,{route:'game',action:'create'},fixed),8);
+ await rejected(()=>enforceRateLimit(app,ip('198.51.100.211'),{route:'game',action:'create'},fixed),'create-10m');
+ console.log('DB identity: spoofed forward headers ignored off-Vercel, duplicate/malformed rejected, unknown-IP fallback limited, IPv6 aliases + mapped IPv4 share quotas');
 });
 
 test('real database time drives rolling one-second windows and Retry-After 429',async()=>{

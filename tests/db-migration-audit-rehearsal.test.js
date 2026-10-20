@@ -84,7 +84,9 @@ test('004->005->006 apply and rerun against disposable PostgreSQL preserving leg
       assert.equal(sql("SELECT has_table_privilege('deckverse_app','deckverse.rate_limit_counters','SELECT,INSERT,UPDATE,DELETE')"),'t');
       for(const role of ['anon','authenticated','service_role'])
         assert.equal(sql("SELECT has_table_privilege('"+role+"','deckverse.rate_limit_counters','SELECT')"),'f');
-      sql("BEGIN; INSERT INTO deckverse.players(room_id,seat,name,token_hash) VALUES ('22222222-2222-2222-2222-222222222222',2,'Third',repeat('d',64)),('22222222-2222-2222-2222-222222222222',3,'Fourth',repeat('e',64)); ROLLBACK;");
+      const overfill=spawnSync(psql,['-X','-q','-v','ON_ERROR_STOP=1','-c',"INSERT INTO deckverse.players(room_id,seat,name,token_hash) VALUES ('22222222-2222-2222-2222-222222222222',2,'Overflow',repeat('d',64))"],{env:{...process.env,...env},encoding:'utf8',timeout:10000});
+      assert.notEqual(overfill.status,0,'2P capacity trigger must reject seat 2');
+      sql("BEGIN; INSERT INTO deckverse.rooms(id,code,mode,status,player_count) VALUES ('33333333-3333-3333-3333-333333333333','GHI789','same','lobby',4); INSERT INTO deckverse.players(room_id,seat,name,token_hash) VALUES ('33333333-3333-3333-3333-333333333333',2,'Third',repeat('d',64)),('33333333-3333-3333-3333-333333333333',3,'Fourth',repeat('e',64)); ROLLBACK;");
       const bad=spawnSync(psql,['-X','-q','-v','ON_ERROR_STOP=1','-c',"INSERT INTO deckverse.players(room_id,seat,name,token_hash) VALUES ('22222222-2222-2222-2222-222222222222',4,'Invalid',repeat('e',64))"],{env:{...process.env,...env},encoding:'utf8',timeout:10000});
       assert.notEqual(bad.status,0,'seat 4 must be rejected');
       sql("SET ROLE deckverse_app; INSERT INTO deckverse.rate_limit_counters(scope,key_hash,window_start,expires_at) VALUES ('join',repeat('f',64),now(),now()+interval '15 minutes'); RESET ROLE;");

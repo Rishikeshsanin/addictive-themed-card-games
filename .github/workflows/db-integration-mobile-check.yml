@@ -2,7 +2,7 @@ name: DeckVerse isolated DB + mobile integration QA
 
 on:
   pull_request:
-    branches: [integration/deckverse-v2-api-wiring]
+    branches: [integration/deckverse-v2-api-wiring, integration/deckverse-v2-release-hardening]
     paths:
       - "tests/db-integration-mobile-*.mjs"
       - ".github/workflows/db-integration-mobile-check.yml"

@@ -3,6 +3,7 @@ on:
   pull_request:
     branches:
       - integration/deckverse-v2-api-wiring
+      - integration/deckverse-v2-release-hardening
     paths:
       - 'tests/db-rate-limit-*.mjs'
       - 'migrations/005_deckverse_rate_limits.sql'
