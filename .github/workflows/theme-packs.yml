@@ -5,6 +5,7 @@ on:
       - "themes/packs/**"
       - "tests/theme-packs.test.js"
       - ".github/workflows/theme-packs.yml"
+      - "docs/V2_CI_PARITY_REVIEW.md"
   workflow_dispatch:
 jobs:
   theme-pack-rules-and-browser:
