@@ -173,8 +173,13 @@ async function forceEndgame(r){
 }
 async function startNewMatchRematch(r,epoch){
  const original=(await row(r)).state;
- const result=await Promise.all(r.members.map(m=>invoke('rematch',{...auth(r,m.seat),expectedMatchNumber:epoch},m.ip)));
- assert.equal(result.filter(x=>x.status===200).length,r.n,'All votes may be accepted exactly once');
+ // Two same-seat votes never substitute for a distinct original participant.
+ await good('rematch',{...auth(r,0),expectedMatchNumber:epoch},r.members[0].ip);
+ await good('rematch',{...auth(r,0),expectedMatchNumber:epoch},r.members[0].ip);
+ assert.equal((await row(r)).status,'finished','Duplicate vote cannot start a match');
+ const result=await Promise.all(r.members.slice(1).map(m=>
+  invoke('rematch',{...auth(r,m.seat),expectedMatchNumber:epoch},m.ip)));
+ assert.equal(result.filter(x=>x.status===200).length,r.n-1,'All unique remaining votes must succeed');
  const updated=(await row(r)).state;
  assert.equal(updated.matchNumber,epoch+1);
  assert.equal(updated.round,0);assert.equal(updated.pot.length,0);
@@ -287,6 +292,58 @@ async function forfeit(n){
  await rejected('rematch',{...auth(r),expectedMatchNumber:1},r.members[0].ip);
  console.log('PASS '+n+'P: forfeit closes match and blocks rematch');
 }
+async function consecutiveAndElimination(n){
+ const r=await createRoom(n);await fillRoom(r);await readyAndStart(r);
+ const first=tieHand(DECKS[n],n);
+ await fixtureHeads(r,first.heads,first.field);
+ const tieOne=await choose(r,first.field);
+ assert.equal(tieOne.last.kind,'tie');assert.equal(tieOne.pot.length,n);
+ await fastForward(r);
+ const next=tieHand(tieOne.players.flatMap(p=>p.deck),n);
+ await fixtureHeads(r,next.heads,next.field);
+ const tieTwo=await choose(r,next.field);
+ assert.equal(tieTwo.last.kind,'tie');assert.equal(tieTwo.pot.length,2*n);
+ assert.equal(tieTwo.chooser,(tieOne.chooser+1)%n,'Consecutive second tie rotates one seat clockwise');
+ await fastForward(r);
+ const prize=await choose(r,'rank');
+ assert.equal(prize.pot.length,0);
+ assert.equal(prize.last.awardedCount,3*n,'Accumulated jackpot awarded exactly once');
+ // Retire seat 1 inside this strictly isolated fixture; the real select must
+ // skip it during even-tie chooser rotation.
+ const saved=await row(r),state=saved.state;
+ state.pot.push(...state.players[1].deck);
+ state.players[1].deck=[];
+ state.chooser=0;state.consecutiveTies=1;state.last=null;
+ validateMulti(state);
+ await fixture`update deckverse.rooms set state=${fixture.json(state)},reveal_until=null,
+  reveal_acks='[]'::jsonb where id=${saved.id}`;
+ const activeIds=state.players.filter((p,i)=>i!==1).flatMap(p=>p.deck);
+ const hand=tieHand(activeIds,n-1);
+ await fixtureHeads(r,[hand.heads[0],null,...hand.heads.slice(1)],hand.field);
+ const after=await choose(r,hand.field);
+ assert.equal(after.last.kind,'tie');assert.equal(after.chooser,2);
+ assert.equal(after.consecutiveTies,2);
+ console.log('PASS '+n+'P: consecutive multiway pot, 2nd tie chooser rotation, skip seat 1');
+}
+async function exhaustedSuddenDeath(n){
+ const r=await createRoom(n);await fillRoom(r);await readyAndStart(r);
+ const hand=tieHand(DECKS[n],n),used=new Set(hand.heads);
+ const saved=await row(r),state=saved.state;
+ state.players=hand.heads.map(id=>({deck:[id]}));
+ state.pot=DECKS[n].filter(id=>!used.has(id));
+ state.chooser=0;state.consecutiveTies=0;state.last=null;
+ state.status='playing';state.winner=null;
+ if(n===2)validate(state);else validateMulti(state);
+ await fixture`update deckverse.rooms set state=${fixture.json(state)},reveal_until=null,
+  reveal_acks='[]'::jsonb where id=${saved.id}`;
+ const result=await choose(r,hand.field);
+ assert.equal(result.status,'finished');assert.equal(result.last.kind,'sudden-death');
+ const winner=hand.heads.findIndex(id=>card(id).rank===Math.min(...hand.heads.map(id=>card(id).rank)));
+ assert.equal(result.winner,winner);
+ assert.equal(result.players[winner].deck.length,n===2?50:n*20);
+ assert.equal(result.pot.length,0);
+ console.log('PASS '+n+'P: all-player exhaustion, unique Rank sudden death, SQL victory');
+}
 async function organic(n){
  const r=await createRoom(n);await fillRoom(r);await readyAndStart(r);
  const ids=DECKS[n],best=new Map(ids.map(id=>{
@@ -332,10 +389,12 @@ try{
  for(const n of [2,3,4])await manual(n);
  await joinRace();
  await forfeit(2);await forfeit(4);
+ for(const n of [3,4])await consecutiveAndElimination(n);
+ for(const n of [2,3,4])await exhaustedSuddenDeath(n);
  for(const n of [2,3,4])await organic(n);
  const summary={kind:'real-postgresql-local-ci',time:new Date().toISOString(),
   migration:'Disposable legacy fixture expanded using 004,005,006; hub.assert_app_scope is test-only stub',
-  suites:'2P/3P/4P transactional API, manual/auto, tie, race, rematch, forfeit, organic completion',
+  suites:'2P/3P/4P transactional API, manual/auto, chained multiway pots, elimination rotation, exhaustion, duplicate rematches, race, forfeit, organic completion',
   coordinatorBlockers:[...new Set(errors)],
   latencyMs:Object.fromEntries(Object.entries(records).map(([k,v])=>[k,{calls:v.length,p50:percentile(v,0.5),p95:percentile(v,.95),max:Math.max(...v)}]))};
  await fs.writeFile('/tmp/deckverse-db-multiplayer-results.json',JSON.stringify(summary,null,2));
