@@ -184,10 +184,20 @@ function renderBattle(){
 }
 function showFinalResult(me){
  const forfeit=game.endReason==='forfeit',win=game.winner===me;
+ const wantsRematch=game.rematchVotes?.includes(me);
+ const votes=game.rematchVotes?.length||0;
+ const rematchAvailable=Boolean(session&&!forfeit&&session.players?.length===2);
+ const action=practice?'REMATCH THE BOT ↗':rematchAvailable?(wantsRematch?'✓ REMATCH REQUESTED':'⚡ PLAY AGAIN — REMATCH ↗'):'BACK TO ROOMS ↗';
  $('result').className='result-pop final '+(win?'win':'loss');
- $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED BY FORFEIT'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':'50 CARDS · ONE LEGEND')+'</p><button class="btn btn-primary" id="play-again">'+(practice?'REMATCH THE BOT ↗':'BACK TO ROOMS ↗')+'</button>';
+ $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED BY FORFEIT'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':'50 CARDS · ONE LEGEND')+' · MATCH '+(game.matchNumber||1)+'</p><button class="btn btn-primary" id="play-again" '+(wantsRematch?'disabled':'')+'>'+action+'</button>'+(rematchAvailable?'<small class="rematch-status">'+(wantsRematch?'Waiting for your rival to agree…':votes+'/2 players requested a rematch')+'</small>':'');
  $('result').classList.remove('hidden');
- $('play-again').onclick=()=>{if(practice)startPractice();else exitGame()};
+ $('play-again').onclick=async()=>{
+  if(practice)return startPractice();
+  if(!rematchAvailable)return exitGame();
+  const b=$('play-again');b.disabled=true;b.textContent='REQUESTING REMATCH…';
+  const ok=await roomAction('rematch');
+  if(!ok&&game?.status==='finished'){b.disabled=false;b.textContent=action}
+ };
 }
 function showRoundResult(last,me){
  if(!last?.cards?.length)return;
