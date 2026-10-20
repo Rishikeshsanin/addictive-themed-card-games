@@ -21,6 +21,10 @@ try {
  const chose=await page.locator('.stat-button:not([disabled])').count();
  if(chose)await page.locator('.stat-button:not([disabled])').first().click();
  else assert.equal(await page.locator('#battle-status').textContent(),'WAITING ON YOUR RIVAL');
+ await page.locator('#result.compact').waitFor({timeout:5500});
+ assert.ok(await page.locator('#my-card .card-name').isVisible(),'Our played card is visible during result');
+ assert.ok(await page.locator('#their-card .card-name').isVisible(),'Opponent played card is visible during result');
+ assert.ok(await page.locator('#result .reveal-summary').isVisible(),'Results do not replace the cards');
  await page.waitForTimeout(2600);
  assert.ok(Number(await page.locator('#round-number').textContent())>=2,'Practice turn must advance');
  await page.setViewportSize({width:390,height:844});
