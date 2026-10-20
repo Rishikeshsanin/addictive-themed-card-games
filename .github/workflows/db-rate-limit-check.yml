@@ -3,10 +3,13 @@ on:
   pull_request:
     branches:
       - integration/deckverse-v2-api-wiring
+      - integration/deckverse-v2-release-hardening
+      - integration/deckverse-v2-theme-preview-20261020
     paths:
       - 'tests/db-rate-limit-*.mjs'
       - 'migrations/005_deckverse_rate_limits.sql'
       - '.github/workflows/db-rate-limit-check.yml'
+      - 'docs/V2_CI_PARITY_REVIEW.md'
       - 'src/server/rate-limit.js'
       - 'api/game.js'
       - 'api/livekit-token.js'
