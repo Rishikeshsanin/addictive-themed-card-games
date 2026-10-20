@@ -41,22 +41,23 @@ test('2/3/4 hand sizes, rank rule, card secrecy and conservation',()=>{
 });
 test('Gameplay ties put cards into jackpot; next win clears it',()=>{
  for(const id of THEME_IDS){
-  const p=getTheme(id),a=p.cards.find(x=>p.cards.some(y=>y.id!==x.id&&y.stats[p.categories[1].key]===x.stats[p.categories[1].key]));
-  assert.ok(a,'At least one tie in '+id);
-  const b=p.cards.find(y=>y.id!==a.id&&y.stats[p.categories[1].key]===a.stats[p.categories[1].key]);
   let s=startPackMatch({themeId:id,playerCount:2,pick:()=>0,chooser:0});
-  for(let seat=0;seat<2;seat++){
-   const top=seat===0?a.id:b.id;
-   const own=s.players[seat].deck,from=own.indexOf(top);
-   if(from>=0)own.splice(from,1);else{
-    const other=s.players[1-seat].deck.indexOf(top);
-    assert.ok(other>=0);
-    const displaced=own.shift();s.players[1-seat].deck.splice(other,1,displaced);
+  const p=getTheme(id),first=s.players[0].deck,second=s.players[1].deck;
+  let pair=null;
+  for(const stat of p.categories.slice(1)){
+   for(const a of first){
+    const b=second.find(x=>getCard(id,x).stats[stat.key]===getCard(id,a).stats[stat.key]);
+    if(b!==undefined){pair=[a,b,stat.key];break}
    }
-   own.unshift(top);
+   if(pair)break;
+  }
+  assert.ok(pair,'At least one cross-seat tie in '+id);
+  const [a,b,key]=pair;
+  for(const [deck,wanted] of [[first,a],[second,b]]){
+   const ix=deck.indexOf(wanted);[deck[0],deck[ix]]=[deck[ix],deck[0]];
   }
   assert.equal(validateMatch(s),true);
-  const t=takeTurn(s,0,p.categories[1].key);
+  const t=takeTurn(s,0,key);
   assert.equal(t.last.kind,'tie',id);assert.equal(t.pot.length,2);
   assert.equal(validateMatch(t),true);
   const win=takeTurn(t,t.chooser,'rank');
