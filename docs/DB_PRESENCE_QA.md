@@ -28,16 +28,21 @@
 | Browser hidden simulation | Missing heartbeat does not forfeit, mark inactive or mutate cards |
 | Legacy/expiry | NULL heartbeat blocks automatic abandonment; expired room is not revived |
 | Locking | Multiple simultaneous heartbeats preserve one authoritative host/version |
+| Conflicting host claims | Concurrent original/new host settings: exactly one succeeds, other receives HTTP 403 |
+| Leave vs heartbeat race | Lock ordering prevents departed seat from being revived |
+| TTL policy mismatch | Proves 3h PostgreSQL expiry precedes 24h abandoned-playing policy horizon |
 | Abandonment | Pure policy derives abandoned condition; **no background worker exists** |
 
-**Verified 2026-10-20:** [Disposable PostgreSQL workflow run 39452136766](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39452136766) **SUCCESS**. Real PostgreSQL 16 service was initialized, TLS activated, migrations 004/005/006 applied in the synthetic schema, migration 006 replayed, and **12/12 Node integration tests passed (0 failures)**. Job 118729432350 completed successfully. This is a single deterministic integration run, not a load/soak test or a live Hub/physical-phone check. 
+**Verified 2026-10-20:** [Disposable PostgreSQL workflow run 39452815138](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39452815138) **SUCCESS**. Real PostgreSQL 16 service was initialized, TLS activated, migrations 004/005/006 applied in the synthetic schema, migration 006 replayed, and **15/15 Node integration tests passed (0 failures)**. Job 118731824495 completed successfully. This is a single deterministic integration run, not a load/soak test or a live Hub/physical-phone check. 
 
 ## Actual CI result and verification boundaries
 
-- 12 integration tests completed successfully using the real V2 API handler and Postgres transactions, including 6 competing authenticated heartbeats and two concurrent round selections. Each host transfer persisted exactly one `host_seat` with `presence_version=1`; duplicate round selections resolved to HTTP 200 and 409 with exactly one game turn. This does not model prolonged database lock contention or mobile packet loss.
+- 15 integration tests completed successfully using the real V2 API handler and Postgres transactions, including 6 competing authenticated heartbeats, two concurrent round selections, an old/new host settings race and a leave/heartbeat race. Each host transfer persisted exactly one `host_seat` with `presence_version=1`; duplicate round selections resolved to HTTP 200 and 409 with exactly one game turn. This does not model prolonged database lock contention or mobile packet loss.
 - `migration 006` was applied twice without error inside disposable PostgreSQL after synthetic base schema, 004 and 005. No live Supabase schema, permissions, role inventory or migration history was accessed.
 - Simulated browser backgrounding advances `last_seen_at` in a *local test database*; **no actual Safari/Chrome background throttling** occurred.
 - GHA engine suite and Vercel are separate checks. Vercel reported a plan/build-rate-limit failure URL on the initial PR commit; that is not a PostgreSQL test failure.
+
+**Expanded-suite evidence:** [PostgreSQL run 39452815138](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39452815138) completed **15 passed / 0 failed** at commit `74940443`. The new competing-host and leave races both passed; a targeted assertion independently reproduced the 3h expiry versus 24h abandonment incompatibility. No physical-device testing occurred.
 
 ## Audit findings for coordinator to assess
 
@@ -52,7 +57,7 @@
 ## Release decision
 
 **NO-GO for production V2 presence until:**
-- **Disposable PostgreSQL integration: SATISFIED for current branch** (12/12, 0 failed, linked run above). Re-run after shared-API or migration edits.
+- **Disposable PostgreSQL integration: SATISFIED for current branch** (15/15, 0 failed, linked run above). Re-run after shared-API or migration edits.
 - Coordinator addresses or consciously accepts the TTL/abandonment discrepancy and snapshot/timestamp risks, demonstrates an authorized cleanup policy, and validates 2/3/4 real HTTP clients.
 - Independent migration-safety owner reviews 004/005/006 scope, RLS, grants, rollback, staging and data-preserving sequence.
 - **Separate explicit user authorization** is obtained for any migration against the real Supabase Project Hub, followed by scoped verification and advisors.
