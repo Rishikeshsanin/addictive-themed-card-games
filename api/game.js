@@ -24,7 +24,8 @@ async function snapshot(db,code,token){
  const found=rows.find(p=>p.token_hash===safeToken(token));
  if(!found)throw fail('Session expired. Rejoin with the room code.',401);
  const me={index:found.seat,name:found.name,ready:found.ready};
- const reveal=room.state?.last?revealState({mode:room.reveal_mode,seconds:room.reveal_seconds,until:room.reveal_until,acks:room.reveal_acks}):null;
+ const activePolicy=room.state?.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
+ const reveal=room.state?.last?revealState({...activePolicy,until:room.reveal_until,acks:room.reveal_acks}):null;
  const game=room.state?{...viewFor(room.state,me.index),reveal,endReason:room.state.endReason||null}:null;
  return {room:{code:room.code,mode:room.mode,status:room.status,revealSettings:{mode:room.reveal_mode,seconds:room.reveal_seconds}},players:rows.map(p=>({index:p.seat,name:p.name,ready:p.ready})),me,game};
 }
@@ -52,14 +53,15 @@ async function action(db,b){
      if(room.status!=='lobby')throw fail('Match already started.');
      await tx`update deckverse.players set ready=${b.ready===true} where room_id=${room.id} and seat=${me.index}`;
    }else if(b.action==='settings'){
-     if(room.status!=='lobby')throw fail('Reveal settings can only change before the match starts.');
+     if(room.status!=='lobby'&&room.status!=='playing')throw fail('Reveal settings cannot change after the match ends.',409);
      if(me.index!==0)throw fail('Only the host can change reveal settings.',403);
      const setting=validateRevealSettings(b.mode,b.seconds);
      await tx`update deckverse.rooms set reveal_mode=${setting.mode},reveal_seconds=${setting.seconds},updated_at=now() where id=${room.id}`;
    }else if(b.action==='ack'){
-     if(!room.state?.last||room.reveal_mode!=='manual')throw fail('No manual reveal is active.',409);
+     const activePolicy=room.state?.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
+     if(!room.state?.last||activePolicy.mode!=='manual')throw fail('No manual reveal is active.',409);
      if(b.expectedRound!==room.state.round)throw fail('The round already changed.',409);
-     const display=revealState({mode:room.reveal_mode,seconds:room.reveal_seconds,until:room.reveal_until,acks:room.reveal_acks});
+     const display=revealState({...activePolicy,until:room.reveal_until,acks:room.reveal_acks});
      if(display.active&&!display.acks.includes(me.index)){
        await tx`update deckverse.rooms set reveal_acks=${tx.json([...display.acks,me.index])},updated_at=now() where id=${room.id}`;
      }
@@ -76,7 +78,8 @@ async function action(db,b){
      const display=revealState({mode:room.reveal_mode,seconds:room.reveal_seconds,until:room.reveal_until,acks:room.reveal_acks});
      if(!mayAdvance(display))throw fail('The previous card reveal is still in progress.',409);
      const state=takeTurn(room.state,me.index,b.stat);
-     const until=revealDeadline({mode:room.reveal_mode,seconds:room.reveal_seconds});
+     state.revealPolicy={mode:room.reveal_mode,seconds:room.reveal_seconds};
+     const until=revealDeadline(state.revealPolicy);
      await tx`update deckverse.rooms set state=${tx.json(state)},status=${state.status},reveal_until=${until},reveal_acks='[]'::jsonb,updated_at=now() where id=${room.id}`;
    }else throw fail('Unknown action.');
  });
