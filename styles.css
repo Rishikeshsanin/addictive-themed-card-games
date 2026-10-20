@@ -93,3 +93,9 @@ html,body,#app{max-width:100%;overflow-x:clip}
  .call-note{font-size:9px}
  .call-dock.minimized{width:164px}
 }
+
+/* V2 candidate: connection recovery and rematch without replacing the current look */
+.network-status{position:sticky;z-index:80;top:0;margin:auto;padding:10px 14px;text-align:center;background:#25213e;color:#f7df8f;border-bottom:1px solid #f1c56b80;font-size:12px;font-weight:800;letter-spacing:.03em}
+.network-status.hidden{display:none!important}
+.rematch-status{display:block;color:#c8bde5;font-size:11px;line-height:1.4;flex:1 1 100%;text-align:center;margin:0}
+#play-again:disabled{opacity:.6;cursor:default}
