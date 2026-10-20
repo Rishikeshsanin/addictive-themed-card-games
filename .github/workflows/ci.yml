@@ -19,6 +19,9 @@ jobs:
         run: |
           node --check src/catalog.js
           node --check src/engine.js
+          node --check src/multi-engine.js
+          node --check src/rematch.js
+          node --check src/reveal.js
           node --check src/app.js
           node --check api/game.js
           node --check api/livekit-token.js
@@ -29,6 +32,8 @@ jobs:
 
       - name: Simulate 2000 complete classic matches
         run: npm run simulate
+      - name: Simulate experimental three- and four-player matches
+        run: node scripts/multi-simulate.js 40
       - name: Start static server
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/deckverse-http.log 2>&1 &
