@@ -89,6 +89,7 @@ test('PG17.6 disposable rehearsal: 007 atomic rollback, legacy data, theme IDs, 
    // Deliberately incompatible pre-existing column must fail and leave no partial trigger.
    await run('ALTER TABLE deckverse.rooms ADD COLUMN theme_id integer NOT NULL DEFAULT 123');
    await assert.rejects(()=>atomic(migration),/007 incompatible existing rooms.theme_id/);
+   await run('ROLLBACK'); // release deliberately aborted transaction before further assertions
    assert.equal((await one("SELECT data_type FROM information_schema.columns WHERE table_schema='deckverse' AND table_name='rooms' AND column_name='theme_id'")).data_type,'integer');
    await run('ALTER TABLE deckverse.rooms DROP COLUMN theme_id'); // fictional fixture ONLY
    await atomic(migration);await atomic(migration);
