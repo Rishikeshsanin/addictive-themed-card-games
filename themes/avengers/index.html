@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080c17">
+<meta name="description" content="An experimental 50-character Avengers Saga themed card battle prototype for DeckVerse. Unofficial development concept.">
+<title>DeckVerse | Avengers Saga — Development Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div class="background-grid" aria-hidden="true"></div>
+<div class="background-halo" aria-hidden="true"></div>
+<header class="topbar">
+ <a class="brand" href="/" aria-label="Back to DeckVerse home"><span class="brand-mark">✦</span><b>DECK<span>VERSE</span></b><span class="divider">/</span><strong>AVENGERS SAGA</strong></a>
+ <div class="top-meta"><span>50 CHARACTER DECK</span><span class="preview-pill">CONCEPT PREVIEW</span></div>
+</header>
+<main id="content">
+ <section class="hero" id="intro" aria-labelledby="hero-heading">
+  <div class="hero-copy">
+   <div class="eyebrow"><span class="pulse"></span> THE SHOWDOWN OF EARTH'S MIGHTIEST</div>
+   <h1 id="hero-heading">WHO'S<br><span>WORTHY?</span></h1>
+   <p>Heroes. Legends. Villains. <strong>One deck, eight categories, a thousand arguments.</strong> Pick the one stat your character can actually win — and take your rival's card.</p>
+   <div class="hero-actions"><button id="start-duel" class="button button-main">⚡ ENTER SOLO ARENA <span>↗</span></button><a class="button button-outline" href="#collection">BROWSE ALL 50 <span>↓</span></a></div>
+   <div class="hero-metrics"><span><b>50</b> CARDS</span><span><b>8</b> STATS</span><span><b>25</b> EACH</span><span><b>1</b> WINNER</span></div>
+   <p class="legal">Unofficial fan-development concept. Character names belong to their respective rights holders. No licensed artwork is supplied. Not affiliated with or endorsed by Marvel.</p>
+  </div>
+  <div class="hero-visual" aria-hidden="true">
+   <div class="orbit one"></div><div class="orbit two"></div>
+   <div class="preview-card card-rear"><div class="preview-mark">✺</div><small>SCARLET WITCH</small></div>
+   <div class="preview-card card-front"><div class="preview-top"><span>DECKVERSE SAGA</span><span>NO. 003</span></div><div class="preview-energy"><div class="preview-symbol">⚡</div></div><h3>THOR</h3><div class="preview-sub">ASGARDIAN • COSMIC VANGUARD</div><div class="preview-bars"><span>STRENGTH <b>97</b></span><span>ENERGY <b>99</b></span><span>ENDURANCE <b>97</b></span></div></div>
+   <div class="floating-tag tag-one">✦ COSMIC CLASS</div><div class="floating-tag tag-two">⚔ 8-WAY SHOWDOWN</div>
+  </div>
+ </section>
+ <section class="collection section" id="collection">
+  <div class="section-header"><div><div class="eyebrow">01 / THE ROSTER</div><h2>MEET THE <span>CONTENDERS.</span></h2><p>Every card has a specialty and a weakness. These are transparent game-tuned ratings, not official Marvel measurements.</p></div><div class="card-count"><span id="collection-count">50</span><small>CHARACTERS</small></div></div>
+  <div class="collection-toolbar"><label class="search-label"><span class="sr-only">Search characters</span><input type="search" id="character-search" placeholder="Search heroes, villains, specialists…" autocomplete="off"></label><div id="filters" class="filter-list" role="group" aria-label="Filter cards by faction"></div></div>
+  <div id="collection-grid" class="collection-grid"></div>
+  <p id="collection-empty" class="empty hidden">No characters match your search.</p>
+ </section>
+ <section class="rules section" id="rules"><div class="eyebrow">02 / THE RULES</div><h2>FAMILIAR RULES.<br><span>NEW RIVALRIES.</span></h2><div class="rules-grid">
+  <article><b>01</b><h3>DEAL THE DECK</h3><p>50 unique cards, randomly shuffled. You receive 25; your rival receives 25.</p></article>
+  <article><b>02</b><h3>CHOOSE A STAT</h3><p>The caller selects one of eight categories. Higher wins — except Rank, where lower wins.</p></article>
+  <article><b>03</b><h3>CLAIM THE CARDS</h3><p>The winner collects both cards and the jackpot, then calls the next category.</p></article>
+  <article><b>04</b><h3>SURVIVE THE TIES</h3><p>Tied cards enter the jackpot. After every second consecutive tie, the caller rotates.</p></article>
+ </div></section>
+ <section class="arena-section section hidden" id="arena" aria-labelledby="arena-heading">
+  <div class="arena-header"><div><div class="eyebrow">03 / PRACTICE ARENA</div><h2 id="arena-heading">THE <span>DUEL.</span></h2></div><div class="arena-actions"><span id="round-label" class="round-badge">ROUND 01</span><button class="button button-outline small" id="leave-duel">✕ LEAVE</button></div></div>
+  <div class="combatants"><div class="combatant"><div class="player-id"><span class="player-symbol">✦</span><div><strong>YOU</strong><small>YOUR DECK</small></div></div><div class="counter"><b id="your-count">25</b> CARDS</div></div><div class="center-badge" id="turn-state">YOUR TURN</div><div class="combatant rival"><div class="counter"><b id="rival-count">25</b> CARDS</div><div class="player-id"><div><strong>THE RIVAL</strong><small>TRAINING AI</small></div><span class="player-symbol enemy">◆</span></div></div></div>
+  <div id="battle-cards" class="battle-cards"><div id="own-card" class="battle-card-slot"></div><div class="vs-divider">VS</div><div id="enemy-card" class="battle-card-slot"></div></div>
+  <div id="result-panel" class="result-panel hidden" role="status" aria-live="polite"></div>
+  <div class="battle-bottom"><div class="battle-instructions"><strong id="battle-prompt">PICK YOUR WINNING CATEGORY</strong><small id="battle-help">Think like a tactician. Your opponent's card stays hidden until the stat is chosen.</small></div><div class="stat-grid" id="stat-actions"></div><div class="pot-line" id="pot-line">◇ NO CARDS IN THE JACKPOT</div></div>
+  <div class="match-complete hidden" id="match-complete"><div id="complete-text"></div><button class="button button-main" id="restart-duel">REMATCH THE AI ↻</button></div>
+  <p class="practice-note">SOLO PRACTICE ONLY — LIVE 2/3/4-PLAYER INTEGRATION IS PENDING REVIEW AND SERVER-SIDE TESTING.</p>
+ </section>
+</main>
+<div class="drawer hidden" id="character-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-name">
+ <button class="drawer-scrim" id="drawer-scrim" aria-label="Close character details"></button>
+ <div class="drawer-content"><div class="drawer-header"><span>CHARACTER INTEL</span><button id="drawer-close" aria-label="Close details">✕</button></div><div id="drawer-body"></div></div>
+</div>
+<footer><span>✦ DECKVERSE / AVENGERS SAGA</span><span>UNOFFICIAL GAME DESIGN STUDY • DEVELOPMENT PREVIEW • NO LICENSED ARTWORK</span><a href="/">BACK TO DECKVERSE ↗</a></footer>
+<script type="module" src="./app.js"></script>
+</body></html>
