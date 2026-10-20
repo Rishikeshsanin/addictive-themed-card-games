@@ -12,7 +12,7 @@ try{
    await page.locator('.theme-tile').first().waitFor();
    assert.equal(await page.locator('.theme-tile').count(),7);
    for(const id of ids){
-     await page.locator('[data-theme="'+id+'"]').click();
+     await page.locator('.theme-tile[data-theme="'+id+'"]').click();
      assert.equal(await page.locator('.collection-card').count(),50,id+' initial 2-player deck');
      await page.locator('#player-filter').selectOption('3');
      assert.equal(await page.locator('.collection-card').count(),60,id+' three-player inventory');
@@ -20,7 +20,7 @@ try{
      assert.equal(await page.locator('.collection-card').count(),80,id+' four-player inventory');
      await page.locator('#player-filter').selectOption('2');
    }
-   await page.locator('[data-theme="shinchan"]').click();
+   await page.locator('.theme-tile[data-theme="shinchan"]').click();
    await page.locator('#search').fill('Shinnosuke');
    assert.equal(await page.locator('.collection-card').count(),4);
    await page.locator('.collection-card').first().click();
