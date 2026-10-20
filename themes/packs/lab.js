@@ -73,28 +73,40 @@ function end(){
  clearTimers();state.game=null;state.showdown=false;$('game').classList.add('hidden');$('end').classList.add('hidden');$('start').textContent='⚡ DEAL THE CARDS';
 }
 const renderBattleCard=(c,hidden,seat)=>{
- const p=pack();
- if(hidden)return '<div class="battle-card hidden-card"><span>'+p.emoji+'</span><strong>CLASSIFIED</strong><small>OPPONENT CARD HIDDEN</small></div>';
+ const p=pack(),last=state.showdown?state.game?.last:null;
+ if(hidden)return '<div class="battle-card hidden-card" aria-label="Bot '+seat+' card concealed"><div class="hidden-sigil">'+visual(p)+'</div><strong>CLASSIFIED</strong><small>OPPONENT CARD HIDDEN</small></div>';
  if(!c)return '<div class="battle-card hidden-card"><strong>NO CARDS LEFT</strong></div>';
- return '<div class="battle-card" style="--h:'+p.hue+'"><div class="battle-top">DECKVERSE / '+escape(p.id.toUpperCase())+' <span>NO. '+c.id+'</span></div><div class="battle-art">'+p.emoji+'</div><h3>'+escape(c.name.toUpperCase())+'</h3><small>'+escape(c.group)+'</small><div class="battle-stats">'+p.categories.map(s=>'<span>'+escape(s.name)+'<b>'+c.stats[s.key]+'</b></span>').join('')+'</div><div class="battle-bottom">SEAT '+(seat+1)+' · GAMEPLAY RATINGS</div></div>';
+ const playedStat=last?.stat,winner=last?.winner===seat;
+ const stats=p.categories.map(s=>{
+  const value=c.stats[s.key],chosen=playedStat===s.key?' played-stat':'';
+  return '<span class="battle-stat'+chosen+'"><em>'+escape(s.name)+'</em><b>'+value+'</b>'+
+   '<i class="stat-meter" aria-hidden="true"><i style="width:'+(s.direction==='min'?Math.round((81-value)/80*100):value)+'%"></i></i></span>';
+ }).join('');
+ return '<div class="battle-card'+(winner?' winning-card':'')+'" style="--h:'+p.hue+'"><div class="battle-top"><span>DECKVERSE / '+escape(p.id.toUpperCase())+'</span><span># '+String(c.id).padStart(3,'0')+'</span></div>'+
+ '<div class="battle-art">'+visual(p)+'</div><div class="battle-identity"><h3>'+escape(c.name.toUpperCase())+'</h3><small>'+escape(c.group)+'</small></div>'+
+ '<div class="battle-stats">'+stats+'</div><div class="battle-bottom"><span>SEAT '+(seat+1)+' · EDITORIAL RATINGS</span><span>'+(winner?'✦ WINNER':'✦ DV')+'</span></div></div>';
 };
 function renderGame(){
  const g=state.game;if(!g)return;
  const p=pack(),v=viewFor(g,0);
  const complete=g.status==='finished';
  $('scoreboard').innerHTML=v.counts.map((n,i)=>'<span class="score '+(g.chooser===i?'caller':'')+'">'+(i===0?'YOU':'BOT '+i)+' <b>'+n+'</b></span>').join('');
- $('jackpot').textContent=v.pot?'◇ '+v.pot+' CARDS IN THE JACKPOT':'◇ NO JACKPOT CARDS';
+ $('jackpot').textContent=v.pot?'✦ JACKPOT · '+v.pot+' CARDS AT STAKE':'◇ NO JACKPOT CARDS';
+ $('jackpot').classList.toggle('jackpot-live',v.pot>0);
+ $('round-indicator').textContent='ROUND '+String(g.round+1).padStart(2,'0')+' / '+(g.status==='finished'?'MATCH OVER':'MATCH LIVE');
  const cards=g.last&&state.showdown?g.last.played.map(x=>({seat:x.seat,card:currentCard(x.id)})):Array.from({length:g.playerCount},(_,i)=>({seat:i,card:i===0?v.topCard:null}));
  $('battle').innerHTML=cards.map(({seat,card})=>'<div class="battle-slot">'+renderBattleCard(card,card===null&&seat!==0,seat)+'<span class="seat-label">'+(seat===0?'YOUR TOP CARD':'BOT '+seat)+'</span></div>').join('');
  if(state.showdown&&g.last){
    const round=g.last;const title=round.kind==='tie'?'TIE — JACKPOT GROWS':round.winner===0?'YOU WIN THE ROUND':round.winner===null?'THE CARDS ARE TIED':'BOT '+round.winner+' WINS';
-   $('reveal').classList.remove('hidden');$('reveal').innerHTML='<strong>'+title+'</strong><span>'+escape(p.categories.find(x=>x.key===round.stat).name)+' · '+round.played.map(x=>escape(x.name)+' '+x.value).join(' VS ')+'</span>';
+   $('reveal').classList.remove('hidden');$('reveal').classList.toggle('jackpot-reveal',round.kind==='tie');$('reveal').classList.toggle('victory-reveal',round.winner===0);$('reveal').innerHTML='<span class="reveal-eyebrow">ROUND '+String(round.round).padStart(2,'0')+' · '+(round.kind==='tie'?'JACKPOT':'SHOWDOWN')+'</span><strong>'+title+'</strong><span>'+escape(p.categories.find(x=>x.key===round.stat).name)+' · '+round.played.map(x=>escape(x.name)+' '+x.value).join(' VS ')+'</span>';
  }else $('reveal').classList.add('hidden');
  const myTurn=g.chooser===0&&!complete&&!state.showdown;
  gameStatus(state.showdown?'ROUND '+g.round+' REVEALED':complete?(g.winner===0?'YOU WIN THE MATCH!':'BOT '+g.winner+' WINS THE MATCH'):myTurn?'YOUR TURN TO CHOOSE':'BOT '+g.chooser+' IS CHOOSING...');
+ $('game-status').classList.toggle('is-victory',complete&&g.winner===0);
+ $('game-status').classList.toggle('is-finished',complete);
  $('prompt').textContent=complete?'MATCH FINISHED':state.showdown?'ROUND RESULT':myTurn?'PICK YOUR STRONGEST CATEGORY':'WAIT FOR BOT '+g.chooser;
  $('help').textContent=complete?'Use NEW MATCH to play another shuffled game.':state.showdown?'The next hand begins automatically.':myTurn?'Choose using YOUR visible card. Other cards stay hidden.':'The bot chooses from its own card without seeing yours.';
- $('actions').innerHTML=p.categories.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(myTurn?'':'disabled')+'><span>'+escape(s.name)+'</span><strong>'+(v.topCard?.stats[s.key]??'—')+'</strong><small>'+(s.direction==='min'?'LOWER':'HIGHER')+' WINS</small></button>').join('');
+ $('actions').innerHTML=p.categories.map(s=>'<button class="stat-button" data-stat="'+s.key+'" aria-label="Choose '+escape(s.name)+', '+(s.direction==='min'?'lower':'higher')+' wins" '+(myTurn?'':'disabled')+'><span>'+escape(s.name)+'</span><strong>'+(v.topCard?.stats[s.key]??'—')+'</strong><small>'+(s.direction==='min'?'↓ LOWER':'↑ HIGHER')+' WINS</small></button>').join('');
  $('actions').querySelectorAll('[data-stat]').forEach(btn=>btn.onclick=()=>move(0,btn.dataset.stat));
 }
 function move(seat,stat){
@@ -115,6 +127,15 @@ $('group').onchange=e=>{state.group=e.target.value;showCards()};
 $('player-filter').onchange=e=>{state.deckSize=Number(e.target.value);showCards()};
 $('players').onchange=e=>{if(state.game)end();$('player-filter').value=e.target.value;state.deckSize=Number(e.target.value);showCards()};
 $('start').onclick=start;$('end').onclick=end;$('close').onclick=closeDetails;$('backdrop').onclick=closeDetails;
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('details').classList.contains('hidden'))closeDetails()});
+document.addEventListener('keydown',e=>{
+ if($('details').classList.contains('hidden'))return;
+ if(e.key==='Escape'){e.preventDefault();closeDetails();return;}
+ if(e.key==='Tab'){
+  const buttons=[...$('details').querySelectorAll('button:not([disabled])')];
+  const first=buttons[0],last=buttons[buttons.length-1];if(!first)return;
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+ }
+});
 const requestedTheme=new URLSearchParams(location.search).get('theme');
 choose(getTheme(requestedTheme)?requestedTheme:'avengers');$('player-filter').value='2';state.deckSize=2;showCards();
