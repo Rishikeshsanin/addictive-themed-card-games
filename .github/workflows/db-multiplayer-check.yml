@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/db-multiplayer-check.yml'
+      - 'docs/V2_CI_PARITY_REVIEW.md'
       - 'tests/db-multiplayer-*.mjs'
       - 'migrations/004_multiplayer_rooms.sql'
       - 'api/game.js'
