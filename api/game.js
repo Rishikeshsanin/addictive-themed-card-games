@@ -1,8 +1,7 @@
 import postgres from 'postgres';
 import {createHash,randomBytes,randomInt} from 'node:crypto';
-import {newGame,takeTurn,viewFor} from '../src/engine.js';
-import {startMultiGame,multiTurn,multiViewFor} from '../src/multi-engine.js';
-import {DECKS,STAT_FIELDS} from '../src/catalog.js';
+import {getServerTheme,requireCreateTheme,requireSameRoomTheme,themeIdForRoom} from '../src/server/theme-registry.js';
+import {startServerThemeMatch,takeServerThemeTurn,themeViewFor} from '../src/server/theme-match.js';
 import {revealState,revealDeadline,mayAdvance,validateRevealSettings} from '../src/reveal.js';
 import {decideRematch} from '../src/rematch.js';
 import {evaluateRoomPresence,retentionSeconds} from '../src/presence.js';
@@ -15,7 +14,9 @@ const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const code=()=>Array.from({length:6},()=>alphabet[randomInt(alphabet.length)]).join('');
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const playerCountOf=r=>r.player_count||2;
-const newMatch=n=>n===2?newGame({ids:DECKS[2]}):startMultiGame({playerCount:n});
+const newMatch=(n,themeId)=>startServerThemeMatch({playerCount:n,themeId});
+const validThemeRequest=body=>{try{return requireCreateTheme(body)}catch{throw fail('Invalid theme or client-controlled deck settings.',400)}};
+const roomTheme=(room,proposed)=>{try{return requireSameRoomTheme(room,proposed)}catch{throw fail('Room theme is fixed for this match.',409)}};
 const allowedAction=new Set(['create','join','get','ready','start','rematch','select','settings','ack','leave','heartbeat']);
 let verified=false;
 async function connected(){if(!sql)throw fail('Game rooms are awaiting an isolated database connection. Solo practice is available.',503);if(!verified){const [r]=await sql`select current_user as role`;if(r.role!=='deckverse_app')throw fail('Game backend configuration failed its dedicated-role security check.',503);verified=true;}return sql}
@@ -76,9 +77,11 @@ async function snapshot(db,code,token){
  const presence=derivePresence(room,players,rows[0].observed_at);
  const activePolicy=room.state?.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
  const reveal=room.state?.last?revealState({...activePolicy,required:count,until:room.reveal_until,acks:room.reveal_acks}):null;
- const view=room.state?(count===2?viewFor(room.state,me.index):multiViewFor(room.state,me.index)):null;
+ const themeId=themeIdForRoom(room);
+ const theme=getServerTheme(themeId);
+ const view=room.state?themeViewFor(room.state,me.index,{roomThemeId:themeId}):null;
  const game=view?{...view,reveal,endReason:room.state.endReason||null,matchNumber:room.state.matchNumber||1,rematchVotes:room.status==='finished'?players.filter(p=>p.ready).map(p=>p.seat):[]}:null;
- return {room:{code:room.code,mode:room.mode,status:room.status,playerCount:count,
+ return {room:{code:room.code,mode:room.mode,status:room.status,themeId,theme:{name:theme.name,categories:theme.categories},playerCount:count,
    hostSeat:room.host_seat??0,presenceVersion:room.presence_version||0,
    paused:presence.paused,revealSettings:{mode:room.reveal_mode,seconds:room.reveal_seconds}},
    players:players.map(p=>({index:p.seat,name:p.name,ready:p.ready,
@@ -105,25 +108,25 @@ export async function sweepExpiredRoomSessions(db,{batch=32}={}){
 async function create(db,b){
  // Opportunity-based, bounded cleanup; never waits for locked active rooms.
  await sweepExpiredRoomSessions(db);
- const name=safeName(b.name),mode=safeMode(b.mode),count=b.playerCount??2,raw=secret(),digest=hash(raw);
+ const name=safeName(b.name),mode=safeMode(b.mode),count=b.playerCount??2,themeId=validThemeRequest(b),raw=secret(),digest=hash(raw);
  if(![2,3,4].includes(count))throw fail('Room size must be 2, 3 or 4.');
  const [active]=await db`select count(*)::integer as count from deckverse.rooms where expires_at>now() and status in ('lobby','playing')`;if(active.count>300)throw fail('Active-room capacity reached. Try again later.',429);
  for(let tries=0;tries<6;tries++){
  const c=code();try{
- await db.begin(async tx=>{const [r]=await tx`insert into deckverse.rooms(code,mode,status,player_count,expires_at) values(${c},${mode},'lobby',${count},clock_timestamp()+${retentionSeconds('lobby')}*interval '1 second') returning id`;await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,last_seen_at) values(${r.id},0,${name},${digest},true,clock_timestamp())`;});
+ await db.begin(async tx=>{const [r]=await tx`insert into deckverse.rooms(code,mode,status,player_count,theme_id,expires_at) values(${c},${mode},'lobby',${count},${themeId},clock_timestamp()+${retentionSeconds('lobby')}*interval '1 second') returning id`;await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,last_seen_at) values(${r.id},0,${name},${digest},true,clock_timestamp())`;});
  return {...await snapshot(db,c,raw),token:raw};
  }catch(e){if(e.code!=='23505'||tries===5)throw e}
  }throw fail('Could not create room. Please try again.',503);
 }
 async function join(db,b){const c=safeCode(b.code),name=safeName(b.name),raw=secret(),digest=hash(raw);
- await db.begin(async tx=>{const r=await readRoom(tx,c,true);if(r.status!=='lobby')throw fail('This match has already started.');const existing=await tx`select seat,name from deckverse.players where room_id=${r.id} and active=true`;if(existing.length>=playerCountOf(r))throw fail('This room is full.');if(existing.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw fail('Please choose a different nickname.');const seat=Array.from({length:playerCountOf(r)},(_,i)=>i).find(i=>!existing.some(p=>p.seat===i));await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,active,last_seen_at) values(${r.id},${seat},${name},${digest},false,true,clock_timestamp()) on conflict (room_id,seat) do update set name=excluded.name,token_hash=excluded.token_hash,ready=false,active=true,left_at=null,last_seen_at=clock_timestamp()`;await tx`update deckverse.rooms set expires_at=clock_timestamp()+${retentionSeconds('lobby')}*interval '1 second' where id=${r.id}`;});
+ await db.begin(async tx=>{const r=await readRoom(tx,c,true);roomTheme(r,b.themeId);if(r.status!=='lobby')throw fail('This match has already started.');const existing=await tx`select seat,name from deckverse.players where room_id=${r.id} and active=true`;if(existing.length>=playerCountOf(r))throw fail('This room is full.');if(existing.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw fail('Please choose a different nickname.');const seat=Array.from({length:playerCountOf(r)},(_,i)=>i).find(i=>!existing.some(p=>p.seat===i));await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,active,last_seen_at) values(${r.id},${seat},${name},${digest},false,true,clock_timestamp()) on conflict (room_id,seat) do update set name=excluded.name,token_hash=excluded.token_hash,ready=false,active=true,left_at=null,last_seen_at=clock_timestamp()`;await tx`update deckverse.rooms set expires_at=clock_timestamp()+${retentionSeconds('lobby')}*interval '1 second' where id=${r.id}`;});
  return {...await snapshot(db,c,raw),token:raw};
 }
 async function action(db,b){
  const c=safeCode(b.code);safeToken(b.token);
  if(b.action==='get')return snapshot(db,c,b.token);
  if(b.action==='leave'){await db.begin(async tx=>{
-  const room=await readRoom(tx,c,true);const me=await auth(tx,room,b.token);
+  const room=await readRoom(tx,c,true);roomTheme(room,b.themeId);const me=await auth(tx,room,b.token);
   await tx`update deckverse.players set active=false,ready=false,left_at=clock_timestamp()
     where room_id=${room.id} and seat=${me.index}`;
   if(room.status==='playing'&&room.state){
@@ -142,7 +145,7 @@ async function action(db,b){
   }
  });return {ok:true};}
  await db.begin(async tx=>{
-   const room=await readRoom(tx,c,true);const me=await auth(tx,room,b.token);
+   const room=await readRoom(tx,c,true);roomTheme(room,b.themeId);const me=await auth(tx,room,b.token);
    const presence=await updatePresence(tx,room,me.index);
    if(b.action==='heartbeat'){
      // Authenticate and update presence; no gameplay mutation.
@@ -167,7 +170,7 @@ async function action(db,b){
      if(room.status!=='lobby')throw fail('Match already started.');
      const ps=await tx`select seat,ready from deckverse.players where room_id=${room.id} and active=true order by seat`;
      if(ps.length!==playerCountOf(room)||!ps.every(p=>p.ready))throw fail('All players must join and be ready.');
-     const state=newMatch(playerCountOf(room));
+     const state=newMatch(playerCountOf(room),themeIdForRoom(room));
      state.matchNumber=1;
      await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
      await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',expires_at=clock_timestamp()+${retentionSeconds('playing')}*interval '1 second',updated_at=clock_timestamp() where id=${room.id}`;
@@ -180,21 +183,21 @@ async function action(db,b){
        await tx`update deckverse.players set ready=true where room_id=${room.id} and seat=${me.index} and active=true`;
      }
      if(decision.restart){
-       const state=newMatch(playerCountOf(room));
+       const state=newMatch(playerCountOf(room),themeIdForRoom(room));
        state.matchNumber=(room.state.matchNumber||1)+1;
        await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
        await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',reveal_until=null,reveal_acks='[]'::jsonb,expires_at=clock_timestamp()+${retentionSeconds('playing')}*interval '1 second',updated_at=clock_timestamp() where id=${room.id}`;
      }
    }else if(b.action==='select'){
      if(room.status!=='playing'||!room.state)throw fail('Match is not active.');
-     if(!STAT_FIELDS.some(stat=>stat.key===b.stat))throw fail('Invalid category.',400);
+     if(!getServerTheme(themeIdForRoom(room)).categories.some(stat=>stat.key===b.stat))throw fail('Invalid category.',400);
      if(presence.paused)throw fail('Match paused while a player reconnects. Your cards are safe.',409);
      if(!Number.isInteger(b.expectedRound)||b.expectedRound!==room.state.round)throw fail('Round has already advanced. Please wait for synchronization.',409);
      const activePolicy=room.state.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
      const display=revealState({...activePolicy,required:playerCountOf(room),until:room.reveal_until,acks:room.reveal_acks});
      if(!mayAdvance(display))throw fail('The previous card reveal is still in progress.',409);
      if(room.state.chooser!==me.index)throw fail('Only the current category chooser may play.',403);
-     const state=playerCountOf(room)===2?takeTurn(room.state,me.index,b.stat):multiTurn(room.state,me.index,b.stat);
+     const state=takeServerThemeTurn(room.state,me.index,b.stat,{roomThemeId:themeIdForRoom(room)});
      state.revealPolicy={mode:room.reveal_mode,seconds:room.reveal_seconds};
      const until=revealDeadline(state.revealPolicy);
      await tx`update deckverse.rooms set state=${tx.json(state)},status=${state.status},reveal_until=${until},reveal_acks='[]'::jsonb,expires_at=clock_timestamp()+${retentionSeconds(state.status)}*interval '1 second',updated_at=clock_timestamp() where id=${room.id}`;
