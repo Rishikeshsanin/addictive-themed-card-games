@@ -8,7 +8,8 @@ import {createServer,request as httpRequest} from 'node:http';
 import postgres from 'postgres';
 import {createHash} from 'node:crypto';
 import {getServerManifest,getServerCard, getServerTheme,ALLOWED_THEME_IDS} from '../src/server/theme-registry.js';
-import {validateServerThemeMatch} from '../src/server/theme-match.js';
+import {validateServerThemeMatch,themeViewFor} from '../src/server/theme-match.js';
+import {consumeQuota} from '../src/server/rate-limit.js';
 
 const NAME='deckverse_round5_ci';
 function checkEnv(name,role){
@@ -237,6 +238,21 @@ try{
  await listen();
  const v=(await sql.unsafe('SHOW server_version_num'))[0].server_version_num;
  assert.equal(Number(v),170006,'PG17.6-only e2e test');
+ const direct=postgres(APP,{ssl:'require',max:1,prepare:false,connect_timeout:4});
+ try{
+  const v1=(await sql.unsafe("SELECT state FROM deckverse.rooms WHERE code='ABC123'"))[0].state;
+  const view=themeViewFor(v1,0,{roomThemeId:'pokemon'});
+  assert.ok(view.topCard,'Stored legacy 2P state must be directly readable');
+  console.log('ROUND5_LEGACY_VIEW_PREFLIGHT_PASS');
+  const roleResult=(await direct.unsafe("SELECT current_user AS role"))[0];
+  assert.equal(roleResult.role,'deckverse_app');
+  const hits=await consumeQuota(direct,{scope:'game-read-1m',subject:'ip:127.88.0.1',max:1200,seconds:60});
+  assert.equal(hits.hits,1);
+  console.log('ROUND5_APP_LIMITER_PREFLIGHT_PASS');
+  const joined=await direct.unsafe("SELECT r.id,p.seat FROM deckverse.rooms r JOIN deckverse.players p ON p.room_id=r.id AND p.active=true WHERE r.code='ABC123' AND r.expires_at>clock_timestamp()");
+  assert.equal(joined.length,2);
+  console.log('ROUND5_APP_ROOM_JOIN_PREFLIGHT_PASS');
+ }finally{await direct.end({timeout:5})}
  const role=await post('get',{code:'ABC123',token:'a'.repeat(64)});
  assert.equal(role.status,200,'API must connect with limited deckverse_app role');
  await legacy();
