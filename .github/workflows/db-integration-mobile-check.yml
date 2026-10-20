@@ -2,10 +2,11 @@ name: DeckVerse isolated DB + mobile integration QA
 
 on:
   pull_request:
-    branches: [integration/deckverse-v2-api-wiring]
+    branches: [integration/deckverse-v2-api-wiring, integration/deckverse-v2-release-hardening, integration/deckverse-v2-theme-preview-20261020]
     paths:
       - "tests/db-integration-mobile-*.mjs"
       - ".github/workflows/db-integration-mobile-check.yml"
+      - "docs/V2_CI_PARITY_REVIEW.md"
       - "docs/DB_INTEGRATION_MOBILE_QA.md"
       - "api/game.js"
       - "api/livekit-token.js"
