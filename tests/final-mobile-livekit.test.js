@@ -151,6 +151,10 @@ async function openClient(browser,fixture,size){
   serviceWorkers:'block',deviceScaleFactor:1});
  const page=await context.newPage();const errors=[];
  page.on('pageerror',error=>errors.push(error.message));
+ await page.route('**/*',route=>{
+  const u=new URL(route.request().url());
+  return u.hostname==='127.0.0.1'?route.continue():route.abort();
+ });
  await page.route('**/api/game?health=1',route=>route.fulfill({status:200,contentType:'application/json',
   body:JSON.stringify({status:'ready',app:'deckverse'})}));
  await page.route('**/api/game',async route=>{
@@ -167,9 +171,8 @@ async function openClient(browser,fixture,size){
   status:200,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'},
   body:fakeSdk()
  }));
- await page.route('**/*',route=>{
-  const u=new URL(route.request().url());return u.hostname==='127.0.0.1'?route.continue():route.abort();
- });
+ // Registered first: more-specific stub routes win; no third-party requests escape.
+ // This also protects against accidentally contacting production LiveKit or other websites.
  const started=performance.now();
  await page.goto('http://127.0.0.1:'+server.address().port+'/',{waitUntil:'domcontentloaded'});
  return {context,page,errors,loadMs:performance.now()-started};
@@ -295,5 +298,105 @@ test('final 2/3/4-player mobile lobby, round, pause, rematch and responsive UI',
   }
   for(const errorsForPage of errors)assert.deepEqual(errorsForPage,[],'JavaScript page errors');
   console.log('FINAL_MOBILE_QA_METRICS='+JSON.stringify(samples));
+ }finally{await browser.close();await new Promise(ok=>server.close(ok));}
+});
+
+test('LiveKit synthetic camera/mic permissions, calls, cleanup, visibility and responsive controls', {timeout:85000},async()=>{
+ const fixture=createFixture();
+ await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/google-chrome',
+  args:['--no-sandbox','--disable-dev-shm-usage','--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream']});
+ try{
+  const client=await openClient(browser,fixture,{width:390,height:844});
+  try{
+   const p=client.page;
+   await p.locator('#pokemon-tile').click();
+   await p.locator('[data-mode="remote"]').click();
+   await p.locator('#player-name').fill('Call QA Host');
+   await waitFor(p,()=>!document.querySelector('#create-room').disabled);
+   await p.locator('#create-room').click();
+   await p.locator('#room-code').waitFor({state:'visible'});
+   const session=await p.evaluate(()=>JSON.parse(sessionStorage.getItem('deckverse_session')));
+   const room=fixture.rooms.get(session.code);
+   // Seed only a synthetic friend in this room; calling remains entirely mocked.
+   room.people.push({index:1,name:'Mocked Friend',ready:true});
+   room.status='playing';room.game=newGame({ids:DECKS[2],chooser:0,picker:()=>0});
+   await waitFor(p,()=>document.querySelector('#battle')&&!document.querySelector('#battle').classList.contains('hidden'));
+   assert.equal(await p.evaluate(()=>window.__qaRooms?.length||0),0,'capture must never start on page load');
+   await p.evaluate(()=>{window.__denyMic=true;window.__denyCam=true});
+   await p.locator('#call-join').click();
+   await waitFor(p,()=>window.__qaRooms?.length===1&&!document.querySelector('#call-join').disabled);
+   assert.equal(await p.evaluate(()=>window.__qaRooms[0].localParticipant.isMicrophoneEnabled),false,'denied mic means listen-only');
+   assert.match(await p.locator('#call-status').textContent(),/permission|ENABLE AUDIO/i);
+   await p.locator('#call-camera').click();
+   await waitFor(p,()=>!document.querySelector('#call-camera').disabled);
+   assert.equal(await p.evaluate(()=>window.__qaRooms[0].localParticipant.isCameraEnabled),false,'camera denied');
+   await p.evaluate(()=>{window.__denyMic=false;window.__denyCam=false});
+   await p.locator('#call-mic').click();
+   await waitFor(p,()=>window.__qaRooms[0].localParticipant.isMicrophoneEnabled===true);
+   await p.locator('#call-audio').click();
+   await waitFor(p,()=>window.__qaRooms[0].canPlayAudio===true);
+   await p.locator('#call-camera').click();
+   await waitFor(p,()=>window.__qaRooms[0].localParticipant.isCameraEnabled===true);
+   const dock=p.locator('#call-dock');
+   if(await dock.evaluate(el=>el.classList.contains('minimized')))await p.locator('#call-minimize').click();
+   await p.locator('#local-video video').waitFor({state:'visible'});
+   for(const size of [{width:320,height:720},{width:390,height:844},{width:768,height:1024},{width:1366,height:900}]){
+    await p.setViewportSize(size);
+    await measure(p,'expanded call',2,size.width);
+    assert.equal(await p.locator('#call-join').count(),1);
+   }
+   // Remote subscription duplication and listener/media cleanup are simulated; not a true WebRTC peer.
+   await p.evaluate(()=>{
+    const r=window.__qaRooms[0];
+    window.__qaAudio={kind:'audio',attachments:0,attach(){
+     this.attachments++;const element=document.createElement('audio');element.dataset.qaRemote='1';return element;
+    },detach(el){el?.remove();return []}};
+    r.emit('TrackSubscribed',window.__qaAudio);r.emit('TrackSubscribed',window.__qaAudio);
+   });
+   assert.equal(await p.locator('audio[data-qa-remote="1"]').count(),1);
+   assert.equal(await p.evaluate(()=>window.__qaAudio.attachments),1);
+   await p.evaluate(()=>{
+    Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});
+    document.dispatchEvent(new Event('visibilitychange'));
+   });
+   assert.match(await p.locator('#call-status').textContent(),/background/i);
+   await p.evaluate(()=>{
+    Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'});
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.__qaRooms[0].emit('Reconnecting');
+   });
+   assert.match(await p.locator('#call-status').textContent(),/Reconnecting/i);
+   await p.evaluate(()=>window.__qaRooms[0].emit('Reconnected'));
+   assert.match(await p.locator('#call-status').textContent(),/reconnected/i);
+   const firstRoom=await p.evaluate(()=>window.__qaRooms.length);
+   await p.locator('#call-leave').click();
+   await waitFor(p,()=>window.__qaRooms[0].disconnected===true);
+   assert.equal(await p.evaluate(()=>window.__qaRooms[0].created.every(t=>t.readyState==='ended')),true);
+   assert.equal(await p.locator('audio[data-qa-remote="1"]').count(),0);
+   assert.equal(await p.locator('#local-video video').count(),0);
+   assert.equal(await p.evaluate(()=>[...window.__qaRooms[0].listeners.values()].every(s=>s.size===0)),true);
+   for(let i=0;i<3;i++){
+    await p.locator('#call-join').click();
+    await waitFor(p,()=>window.__qaRooms?.[window.__qaRooms.length-1]?.localParticipant.isMicrophoneEnabled===true);
+    await p.locator('#call-camera').click();
+    await waitFor(p,()=>window.__qaRooms.at(-1).localParticipant.isCameraEnabled===true);
+    await p.locator('#call-leave').click();
+    await waitFor(p,()=>window.__qaRooms.at(-1).disconnected===true);
+    const check=await p.evaluate(()=>({
+     tracksEnded:window.__qaRooms.at(-1).created.every(t=>t.readyState==='ended'),
+     listenersEmpty:[...window.__qaRooms.at(-1).listeners.values()].every(s=>s.size===0),
+     videos:document.querySelectorAll('#local-video video').length,
+     audio:document.querySelectorAll('#call-dock audio').length
+    }));
+    assert.deepEqual(check,{tracksEnded:true,listenersEmpty:true,videos:0,audio:0},'Cycle '+i+' leaks media or listeners');
+   }
+   assert.equal(await p.evaluate(()=>window.__qaRooms.length),firstRoom+3);
+   await p.reload({waitUntil:'domcontentloaded'});
+   assert.equal(await p.evaluate(()=>window.__qaRooms?.length||0),0,'refresh must not reactivate capture');
+   assert.deepEqual(client.errors,[],'Call media browser page errors');
+   await p.screenshot({path:'/tmp/deckverse-final-livekit-390.png',fullPage:true});
+   console.log('PASS synthetic LiveKit denied→allowed mic/camera, audio unlock, visibility, reconnect, duplicate-track guard, repeated leave cleanup and four widths');
+  }finally{await client.context.close();}
  }finally{await browser.close();await new Promise(ok=>server.close(ok));}
 });
