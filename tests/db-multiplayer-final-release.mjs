@@ -250,8 +250,10 @@ async function migrationParity(){
   assert.equal(t.relrowsecurity,true,`RLS missing ${name}`);
   assert.equal(t.relforcerowsecurity,true,`FORCE RLS missing ${name}`);
  }
- const columns=await sql`select table_name,column_name from information_schema.columns
-  where table_schema='deckverse'`;
+ const columns=await sql`select c.relname as table_name,a.attname as column_name
+  from pg_attribute a join pg_class c on c.oid=a.attrelid
+  where c.relnamespace='deckverse'::regnamespace and c.relkind='r'
+  and a.attnum>0 and not a.attisdropped`;
  for(const key of ['rooms:player_count','rooms:host_seat','rooms:presence_version',
   'players:left_at','rate_limit_counters:key_hash']){
   assert.ok(columns.some(c=>c.table_name+':'+c.column_name===key),'Missing migrated column '+key);
