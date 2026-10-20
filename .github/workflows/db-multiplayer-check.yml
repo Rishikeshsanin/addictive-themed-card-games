@@ -1,0 +1,121 @@
+name: DeckVerse disposable PostgreSQL multiplayer QA
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/db-multiplayer-check.yml'
+      - 'tests/db-multiplayer-*.mjs'
+      - 'migrations/004_multiplayer_rooms.sql'
+      - 'api/game.js'
+      - 'src/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-postgresql-multiplayer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      DB_MULTIPLAYER_TEST_ONLY: '1'
+      DECKVERSE_DATABASE_URL: 'postgres://deckverse_app:disposable_only_ci@127.0.0.1:5432/deckverse_ci?sslmode=require'
+      DB_MULTIPLAYER_FIXTURE_URL: 'postgres://deckverse_ci_fixture:disposable_fixture_only@127.0.0.1:5432/deckverse_ci?sslmode=require'
+      CHROME_PATH: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Node dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Provision local disposable PostgreSQL 16 with SSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-16 postgresql-client-16
+          sudo pg_ctlcluster 16 main start || sudo pg_ctlcluster 16 main status
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE deckverse_app LOGIN PASSWORD 'disposable_only_ci';
+          CREATE ROLE deckverse_ci_fixture LOGIN PASSWORD 'disposable_fixture_only';
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN;
+          CREATE DATABASE deckverse_ci;
+          SQL
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci <<'SQL'
+          -- Fictional schema only: matches the subset of legacy DeckVerse columns used by
+          -- the current V2 API. This is NOT a production schema snapshot or real Hub.
+          CREATE SCHEMA deckverse;
+          CREATE SCHEMA hub;
+          CREATE FUNCTION hub.assert_app_scope(slug text, schema_name text) RETURNS void
+          LANGUAGE plpgsql AS $$
+          BEGIN
+            IF slug <> 'deckverse' OR schema_name <> 'deckverse' THEN
+              RAISE EXCEPTION 'Disposable test app scope must be deckverse';
+            END IF;
+          END $$;
+          CREATE TABLE deckverse.rooms (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            code varchar(6) NOT NULL UNIQUE,
+            mode text NOT NULL CHECK (mode IN ('same','remote')),
+            status text NOT NULL DEFAULT 'lobby' CHECK (status IN ('lobby','playing','finished')),
+            state jsonb,
+            reveal_mode text NOT NULL DEFAULT 'auto',
+            reveal_seconds integer NOT NULL DEFAULT 2,
+            reveal_until timestamptz,
+            reveal_acks jsonb NOT NULL DEFAULT '[]'::jsonb,
+            expires_at timestamptz NOT NULL DEFAULT (now()+interval '3 hours'),
+            updated_at timestamptz NOT NULL DEFAULT now()
+          );
+          CREATE TABLE deckverse.players (
+            room_id uuid NOT NULL REFERENCES deckverse.rooms(id),
+            seat smallint NOT NULL,
+            name text NOT NULL,
+            token_hash char(64) NOT NULL,
+            ready boolean NOT NULL DEFAULT false,
+            active boolean NOT NULL DEFAULT true,
+            last_seen_at timestamptz DEFAULT now(),
+            PRIMARY KEY (room_id,seat),
+            CONSTRAINT players_seat_check CHECK (seat BETWEEN 0 AND 1)
+          );
+          -- 004 must expand a truly legacy two-seat table, not an already-upgraded one.
+          INSERT INTO deckverse.rooms (code,mode,status) VALUES ('LEGACY','same','lobby');
+          INSERT INTO deckverse.players(room_id,seat,name,token_hash,ready)
+            SELECT id,0,'Legacy fixture',repeat('a',64),true FROM deckverse.rooms WHERE code='LEGACY';
+          SQL
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/004_multiplayer_rooms.sql
+          # Test 004 idempotence and preservation of the legacy 2P row in disposable SQL.
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/004_multiplayer_rooms.sql
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/005_deckverse_rate_limits.sql
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/006_deckverse_presence.sql
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci <<'SQL'
+          -- Restricted fictional test roles; no real Hub resource or global secrets.
+          GRANT CONNECT ON DATABASE deckverse_ci TO deckverse_app, deckverse_ci_fixture;
+          GRANT USAGE ON SCHEMA deckverse TO deckverse_app, deckverse_ci_fixture;
+          GRANT SELECT,INSERT,UPDATE,DELETE ON deckverse.rooms,deckverse.players TO deckverse_app;
+          GRANT SELECT,UPDATE ON deckverse.rooms,deckverse.players TO deckverse_ci_fixture;
+          ALTER TABLE deckverse.rooms ENABLE ROW LEVEL SECURITY;
+          ALTER TABLE deckverse.players ENABLE ROW LEVEL SECURITY;
+          ALTER TABLE deckverse.rooms FORCE ROW LEVEL SECURITY;
+          ALTER TABLE deckverse.players FORCE ROW LEVEL SECURITY;
+          CREATE POLICY ci_rooms_access ON deckverse.rooms FOR ALL TO deckverse_app,deckverse_ci_fixture USING (true) WITH CHECK (true);
+          CREATE POLICY ci_players_access ON deckverse.players FOR ALL TO deckverse_app,deckverse_ci_fixture USING (true) WITH CHECK (true);
+          SQL
+          psql "$DECKVERSE_DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atc "SELECT current_user || ':' || (SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()) || ':' || (SELECT COUNT(*) FROM deckverse.rooms WHERE code='LEGACY');" | grep -Fx 'deckverse_app:true:1'
+          psql "$DB_MULTIPLAYER_FIXTURE_URL" -X -v ON_ERROR_STOP=1 -Atc "SELECT COUNT(*) FROM deckverse.players WHERE seat=0;" | grep -Fx '1'
+          echo 'Disposable SSL PostgreSQL and legacy -> 004/005/006 fixture migration verified.'
+      - name: Database-backed API game and transaction tests
+        run: node tests/db-multiplayer-api.mjs
+      - name: Real PostgreSQL-backed mobile browser sessions
+        run: node tests/db-multiplayer-browser.mjs
+      - name: Upload isolated QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deckverse-disposable-db-qa
+          path: |
+            /tmp/deckverse-db-multiplayer-*.png
+            /tmp/deckverse-db-multiplayer-results.json
+          if-no-files-found: ignore
