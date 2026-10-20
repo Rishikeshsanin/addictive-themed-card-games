@@ -48,9 +48,7 @@ test('migration scripts are self-scoped, bounded, and avoid unapproved destructi
   assert.doesNotMatch(noncomments,/\b(?:DROP\s+TABLE|DROP\s+SCHEMA|TRUNCATE|ALTER\s+ROLE|CREATE\s+ROLE|SET\s+ROLE|DELETE\s+FROM)\b/i);
  }
 });
-function requireText(name){return requireFile(path.join(root,'migrations',name))}
-function requireFile(p){return (awaitFreeRead(p))}
-function awaitFreeRead(p){return readFileSync(p,'utf8')}
+function requireText(name){return readFileSync(path.join(root,'migrations',name),'utf8')}
 
 const bin=binaryDirectory();
 const supported=!!bin && typeof process.getuid==='function' && process.getuid()!==0;
@@ -77,7 +75,7 @@ test('real local PG: backup, double-migrate, capacity, restore and locking', {sk
   const baseline=execute(fingerprint);
   assert.match(baseline,/^[a-f0-9]{32}$/);
   const backup=path.join(work,'deckverse-v1-only.dump');
-  run(pg.dump,['-X','-Fc','--schema=deckverse','--file='+backup,'--dbname=postgres'],env);
+  run(pg.dump,['-Fc','--schema=deckverse','--file='+backup,'--dbname=postgres'],env);
   console.log('DISPOSABLE_BACKUP_CREATED fictional deckverse schema only');
   for(let pass=0;pass<2;pass++){
    for(const name of migrations)migration(name);
