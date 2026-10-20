@@ -39,3 +39,23 @@ Always read `hub.read_me_first` and the repository's `AGENTS.md` and `SUPABASE_H
 7. Verify Vercel deployment protection doesn't prevent intended public access.
 
 Nothing else should be reported production-ready until these items are green.
+
+
+## V1.2 — in-match host settings and LiveKit integration
+
+- The **host** can open **Reveal Settings** from the battle header and choose Manual or Automatic 2/3/5/8 seconds, both before and during a game.
+- The policy for an already revealed round is snapshotted in authoritative game state. Host changes apply to the **next** round only, so neither player can prematurely hide or skip cards.
+- Only the host may update settings. Other players cannot call the `settings` API successfully.
+- DeckVerse uses a lazy-loaded LiveKit client with microphone-only opt-in, optional video, local thumbnail, remote video, mute/unmute, supported camera switching, minimize, and reconnection status. Calling is independent from card gameplay.
+- Token issuance checks the private DeckVerse room, active membership, `remote` room type and active match. It returns a token restricted to `deckverse-<room_uuid>`; no LiveKit key is sent to the browser.
+- `GET /api/livekit-token` returns only `{"configured": true/false}` (never credentials) so the UI can explain missing LiveKit setup.
+
+**Still required for real voice/video:**
+1. Create your own LiveKit Cloud project for DeckVerse at https://cloud.livekit.io/, distinct from any existing Imposter X project (unless you explicitly authorize reuse).
+2. Copy its WebSocket URL (`wss://...`) and API key and secret from that project's credentials.
+3. In Vercel > addictive-themed-card-games > Settings > Environment Variables, add 3 **Secret** production variables: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`.
+4. Redeploy only DeckVerse. Do not paste secrets into GitHub or ChatGPT and do not change Imposter X credentials.
+5. Verify `GET /api/livekit-token` reports `configured:true`, then open a **Remote Room** on two phones, start the match, click Join Voice, permit microphone, and separately try optional cameras. Test denied permissions, disconnect, reconnect, backgrounding and mobile browser autoplay rules.
+6. Real LiveKit end-to-end verification cannot pass until these variables exist.
+
+**Keep this honest:** JavaScript code, API guard and browser UI can pass without actual media connectivity; those tests are not proof of a successfully established LiveKit room.
