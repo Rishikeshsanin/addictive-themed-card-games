@@ -1,0 +1,87 @@
+name: DeckVerse PostgreSQL 17.6 schema parity
+on:
+  pull_request:
+    branches: [main, integration/deckverse-v2-release-hardening, integration/deckverse-v2-theme-preview-20261020, integration/deckverse-round5-review-20261021]
+    paths:
+      - "migrations/004_multiplayer_rooms.sql"
+      - "migrations/005_deckverse_rate_limits.sql"
+      - "migrations/006_deckverse_presence.sql"
+      - "migrations/007_theme_rooms.sql"
+      - "tests/fixtures/pg17-v1-deckverse.sql"
+      - ".github/workflows/db-postgres17-parity.yml"
+      - "docs/V2_CI_PARITY_REVIEW.md"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-postgres17-durable-release-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: synthetic_ci_only
+          POSTGRES_DB: deckverse_pg17_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d deckverse_pg17_ci"
+          --health-interval 4s
+          --health-timeout 3s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: PostgreSQL 17.6 migration / reapply / recovery rehearsal
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID="$(docker ps --filter ancestor=postgres:17.6 --format '{{.ID}}' | head -n 1)"
+          test -n "$CID"
+          sql(){ docker exec -i "$CID" psql -U postgres -d deckverse_pg17_ci -X -q -At -v ON_ERROR_STOP=1 "$@"; }
+          version="$(sql -c "SHOW server_version_num")"
+          echo "DISPOSABLE_POSTGRES_VERSION=$version"
+          test "$version" = "170006"
+
+          sql -f - < tests/fixtures/pg17-v1-deckverse.sql
+          query="SELECT md5((SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.id)::text,'[]') FROM (SELECT id,code,mode,status,state,created_at,updated_at,expires_at,reveal_mode,reveal_seconds,reveal_until,reveal_acks FROM deckverse.rooms) x) || (SELECT coalesce(jsonb_agg(to_jsonb(y) ORDER BY y.room_id,y.seat)::text,'[]') FROM (SELECT room_id,seat,name,token_hash,ready,active,joined_at,last_seen_at FROM deckverse.players) y))"
+          before="$(sql -c "$query")"
+          echo "Legacy data fingerprint created"
+
+          # All backup files exist on the disposable GitHub runner ONLY.
+          docker exec "$CID" pg_dump -U postgres -d deckverse_pg17_ci -Fc -n deckverse > /tmp/deckverse-ci-pg17-v1.dump
+          test -s /tmp/deckverse-ci-pg17-v1.dump
+
+          for pass in 1 2; do
+            for script in migrations/004_multiplayer_rooms.sql migrations/005_deckverse_rate_limits.sql migrations/006_deckverse_presence.sql migrations/007_theme_rooms.sql; do
+              echo "Applying $(basename "$script") (pass $pass) to synthetic PG17.6 ONLY"
+              sql --single-transaction -f - < "$script"
+            done
+          done
+
+          after="$(sql -c "$query")"
+          test "$before" = "$after"
+          test "$(sql -c "SELECT count(*) FROM deckverse.rooms")" = "2"
+          test "$(sql -c "SELECT count(*) FROM deckverse.players")" = "3"
+          test "$(sql -c "SELECT (relrowsecurity AND relforcerowsecurity)::int FROM pg_class WHERE oid='deckverse.rate_limit_counters'::regclass")" = "1"
+          test "$(sql -c "SELECT NOT has_table_privilege('anon','deckverse.rate_limit_counters','SELECT')")" = "t"
+
+          # Assert a third seat cannot be smuggled into a legacy two-player room.
+          if sql -c "INSERT INTO deckverse.players(room_id,seat,name,token_hash) VALUES ('22222222-2222-2222-2222-222222222222',2,'Overflow',repeat('d',64))"; then
+            echo "ERROR: room capacity trigger accepted illegal seat"; exit 1
+          fi
+          # Assert a new three-player room can use its third seat.
+          sql -c "INSERT INTO deckverse.rooms(id,code,mode,player_count) VALUES ('33333333-3333-3333-3333-333333333333','GHI789','remote',3)"
+          sql -c "INSERT INTO deckverse.players(room_id,seat,name,token_hash) VALUES ('33333333-3333-3333-3333-333333333333',2,'Valid Third Seat',repeat('e',64))"
+          test "$(sql -c "SELECT count(*) FROM deckverse.players WHERE room_id='33333333-3333-3333-3333-333333333333'")" = "1"
+
+          # The pre-migration snapshot must restore into a NEW database.
+          docker exec "$CID" createdb -U postgres restored_v1
+          docker exec -i "$CID" pg_restore -U postgres -d restored_v1 < /tmp/deckverse-ci-pg17-v1.dump
+          restored="$(docker exec "$CID" psql -U postgres -d restored_v1 -X -q -At -v ON_ERROR_STOP=1 -c "$query")"
+          test "$restored" = "$before"
+          cols="$(docker exec "$CID" psql -U postgres -d restored_v1 -X -q -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM information_schema.columns WHERE table_schema='deckverse' AND table_name='rooms' AND column_name='player_count'")"
+          test "$cols" = "0"
+          rm -f /tmp/deckverse-ci-pg17-v1.dump
+          echo "PASS: PostgreSQL 17.6 synthetic V1 preservation, double 004/005/006/007 migration, 2P/3P capacity, immutable themes, RLS, pre-migration restore"

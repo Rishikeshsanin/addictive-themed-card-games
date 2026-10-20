@@ -8,7 +8,8 @@
     "test": "node --test tests/*.test.js",
     "balance": "node scripts/balance.js",
     "test:ui": "node tests/ui-smoke.mjs",
-    "simulate": "node scripts/simulate.js 2000"
+    "simulate": "node scripts/simulate.js 2000",
+    "simulate:multi": "node scripts/multi-simulate.js 100"
   },
   "dependencies": {
     "postgres": "^3.4.5",
