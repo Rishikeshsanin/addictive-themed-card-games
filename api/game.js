@@ -75,7 +75,8 @@ async function action(db,b){
    }else if(b.action==='select'){
      if(room.status!=='playing'||!room.state)throw fail('Match is not active.');
      if(!Number.isInteger(b.expectedRound)||b.expectedRound!==room.state.round)throw fail('Round has already advanced. Please wait for synchronization.',409);
-     const display=revealState({mode:room.reveal_mode,seconds:room.reveal_seconds,until:room.reveal_until,acks:room.reveal_acks});
+     const activePolicy=room.state.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
+     const display=revealState({...activePolicy,until:room.reveal_until,acks:room.reveal_acks});
      if(!mayAdvance(display))throw fail('The previous card reveal is still in progress.',409);
      const state=takeTurn(room.state,me.index,b.stat);
      state.revealPolicy={mode:room.reveal_mode,seconds:room.reveal_seconds};
