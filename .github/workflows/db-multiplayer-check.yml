@@ -86,6 +86,8 @@ jobs:
             SELECT id,0,'Legacy fixture',repeat('a',64),true FROM deckverse.rooms WHERE code='LEGACY';
           SQL
           sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/004_multiplayer_rooms.sql
+          # Test 004 idempotence and preservation of the legacy 2P row in disposable SQL.
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/004_multiplayer_rooms.sql
           sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/005_deckverse_rate_limits.sql
           sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/006_deckverse_presence.sql
           sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci <<'SQL'
