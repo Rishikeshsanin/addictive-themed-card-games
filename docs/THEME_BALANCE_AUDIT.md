@@ -72,8 +72,44 @@ Because Rank is sorted from total seven-stat strength, a strong draft character 
 
 The historical [Pokémon V2 fairness study](FAIRNESS_V2.md) ran 600 matched shuffled seeds per mode under the best-category heuristic and reported **normal-opening first-chooser rates** of approximately **59.17% (2P), 42.67% (3P), 32.04% (4P)** against 50%, 33.33%, 25% neutral shares, with zero capped best-strategy games at 3,000 rounds. Under **random** category choice, its 4-player games had **260/2,400** unfinished at the 3,000-round cap. Those numbers describe the original Pokémon decks and **different engine implementations**, not direct statistical baselines for the new themed packs. Compare direction and *excess over neutral* rather than asserting the same target outcome. A different category score distribution, restricted first 50 manifests and bot policy can change chooser advantage and duration.
 
-## Numerical results and release blockers
+## Measured static inventory and category-dominance results
 
-**Initial CI outcome awaiting execution.** After GitHub tests finish, insert the measured roster dominance and category tie rates, manifest strength shifts, seeded 2/3/4 match outcomes, capped rates, first chooser and seat splits, longest matches, high-severity card counts and the exact CI links. Do not promote these 560 provisional cards on the basis of source-level checks alone.
+The first complete [CI run 39479853185](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479853185) passed **114/114 tests**, including every roster and card-review export. Static 560-card results use exactly the checked-in generated scores. **HIGH is an algorithmic editorial-review flag, not a known erroneous fictional rating.**
 
-**Release verdict: NOT APPROVED** until a human editorial pass reviews all 560 CSV/JSON rows, severity flags and named classifications; simulations demonstrate appropriate fairness using adequate independent seeds; product owners decide what constitutes unacceptable first chooser advantage, excessive round length or a fair tie mechanic; theme-server integration is tested with concealed decks against an approved isolated database; and each relevant character/trademark/person-likeness right is cleared. No production resource has been accessed or changed.
+| Theme | High-priority cards / 80 | Seven-plus category dominated PAIRS in 50 / 60 / 80 | Full 80-card static win fraction (weakest → strongest) | First-50 cards' average win fraction *against all 80* |
+|---|---:|---:|---:|---:|
+| Avengers | 62 | 417 / 537 / **806** | 14.6%–93.6% | 50.636% |
+| Ben 10 | 27 | 186 / 238 / **352** | 30.2%–99.3% | 50.087% |
+| Shin-chan | 24 | 65 / 82 / **148** | 30.5%–71.8% | 51.377% |
+| DC | 36 | 235 / 385 / **583** | 13.2%–94.5% | 48.354% |
+| Naruto | 52 | 409 / 593 / **1,050** | 15.5%–96.8% | 51.684% |
+| Cricket | 38 | 271 / 357 / **544** | 23.0%–92.9% | 52.347% |
+| Elemental Realms | 19 | 41 / 52 / **97** | 28.7%–69.6% | 48.638% |
+
+**Severity totals:** 0 critical structural violations; **258 high** card flags; **197 medium**; 105 none. These severity counts classify each card **once** by its highest heuristic/manual flag; individual cards may have multiple recorded reasons. Dhoni correctly passes the immutable role/group check but is HIGH for numeric dominance, which is different from a classification error. The provided 560-row JSON/CSV report contains each individual score and all flagged reasons. No duplicate normalized full card labels were detected; potential *persona/version* overlaps remain marked for human inspection.
+
+Out of **3,160 possible unordered pairs** in each 80-card manifest, Naruto has **1,050** where one card wins 7+ of 8 traits (33.23%); Avengers **806** (25.51%); DC **583** (18.45%); Cricket **544** (17.22%); Ben 10 **352** (11.14%). The original Pokémon 80-card benchmark had only **36** such pairs (1.14%). Elemental Realms is closest to that pattern at 97 (3.07%), though theme-specific gameplay tradeoffs are not equivalent to Pokémon balancing.
+
+First-50 average strength is not perfectly neutral against the 80-card inventory; Cricket's +2.35 percentage-point shift, Naruto's +1.68 and Shin-chan's +1.38 suggest early roster cards tend stronger than later additions; DC's −1.65 and Fantasy's −1.36 shift the opposite way. Compare this against a **position-stratified rating design**, not necessarily a requirement to force every set to exactly 50%.
+
+**Category ties (unordered pairs):** all seven packs have **zero Rank ties**. Example high non-Rank exact-tie rates: Fantasy Might **4.146%**, Shin-chan Luck **3.987%**, Cricket Consistency **3.892%**, Naruto Strategy **3.608%**, DC Intellect **3.513%**, Ben 10 Durability **3.639%**. These are potential pair ties; the simulated actual tied-round rate varies with the chosen stat and active seats.
+
+### High-impact card-by-card numeric prompts
+
+| Theme | Card / sample | Measured concern | Review action |
+|---|---|---|---|
+| Avengers | Iron Man, Thanos, Thor, Ultron | Every-category pair domination exists; Thanos also near-ceiling clustering | Define comic/MCU version and meaningful energy-vs-physical weaknesses |
+| Ben 10 | Ben Tennyson, Feedback, Diamondhead; Alien X | Very broad simultaneous scoring; best card wins 99.3% of unordered category comparisons | Check power scope, alien-version context and tradeoff identities |
+| DC | Superman, Batman, Wonder Woman, Martian Manhunter | Some all-eight-category pair domination; full-deck win shares as low as 13.2% | Make weaker characters competitive through well-defined specialty categories |
+| Naruto | Naruto, Sasuke, Itachi, Pain, Madara | 1,050 dominated pairs, exceptional full-roster imbalance | Separate form/era versions and reduce duplicate advantages from derived Rank |
+| Cricket | Sachin, Bumrah, Dhoni, Mithali, Jhulan, Virat | Iconic strengths/role defaults and broad dominance; woman specialist role conflation | Correct taxonomy first; expert-review scores against role-specific opponents |
+| Shin-chan | Toru Kazama scenarios, Ms. Matsuzaka scenarios | Several different *invented scenarios* have broad dominance | Evaluate scenario tone and avoid fictional-scenario modifier anomalies |
+| Elemental Realms | Ember Wyvern, Grove Warden, Moon Warden | Elemental variants differ by small hashes and some pair domination | Manually tune archetype strengths by realm without implying canon |
+
+### Simulated first-chooser, ties, caps and completion
+
+[Small pilot run 39479853185](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479853185): four seed blocks per theme/player count, every chooser seat rotated, best/random/Rank, cap 1,200. Every one of 21 rank-only two-/three-/four-player scenarios ran; some 4-player random strategy runs reached the round cap. The largest concern is **DC random 4-player: 12 of 16 unfinished by 1,200**; Cricket random 4-player also **12/16 capped**, Ben 10 and Naruto random 4-player **8/16 capped**. Avengers **best** 4-player had **3/16 capped**, demonstrating that long matches are not only a random-strategy issue. No scored cap should be called a permanent game loop without matching repeated-state evidence.
+
+This pilot is **not a statistically adequate first-chooser fairness claim**: only four independent shuffle blocks per scenario, and cap censoring removes whole blocks from the win-rate CI. A separate expanded 12-block / 3,000-round-cap pass is being executed to improve the exploratory estimates. The existing Pokémon study had 600 seed blocks, so even the expanded audit remains a **screening gate**, not sign-off.
+
+**Release verdict: NOT APPROVED** until a human editorial pass reviews all 560 CSV/JSON rows, severity flags and named classifications; simulations demonstrate appropriate fairness using more independent seeds; product owners decide what constitutes unacceptable first chooser advantage, excessive round length or a fair tie mechanic; theme-server integration is tested with concealed decks against an approved isolated database; and each relevant character/trademark/person-likeness right is cleared. No production resource has been accessed or changed.
