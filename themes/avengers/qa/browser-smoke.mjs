@@ -1,7 +1,7 @@
 // Standalone Avengers Saga preview: no production database, media, or accounts.
 import {chromium} from 'playwright-core';
 import assert from 'node:assert/strict';
-const base='http://127.0.0.1:4173/themes/avengers/';
+const base='http://127.0.0.1:4173/themes/avengers/?qa-chooser=0';
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 try{
  for(const [width,height] of [[320,568],[390,844],[768,1024],[1440,900]]){
