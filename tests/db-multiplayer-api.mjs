@@ -19,7 +19,7 @@ if(process.env.DB_MULTIPLAYER_TEST_ONLY!=='1'||!URL.includes('@127.0.0.1:5432/de
  throw Error('REFUSING execution: disposable loopback deckverse_ci PostgreSQL only');
 const {default:handler}=await import('../api/game.js');
 const fixture=postgres(FIXTURE,{ssl:'require',max:5,prepare:false});
-const records=[],errors=[];
+const records=Object.create(null),errors=[];
 let clientNumber=10;
 const newIP=()=>{const n=clientNumber++;return '198.18.'+Math.floor(n/240)+'.'+(n%240+1)};
 function record(name,ms){(records[name]??=[]).push(Math.round(ms*10)/10)}
