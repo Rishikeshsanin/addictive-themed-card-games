@@ -67,4 +67,24 @@ The `/tmp/deckverse-db-multiplayer-results.json` artifact captures run-specific 
 
 ## Measured CI results
 
-**Pending initial isolated CI execution.** Update the PR body and issue with the exact run URL, passes/failures and timings after a run concludes; do not treat test definitions as results.
+**Verified successful baseline:** [Actions run 39453454974](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39453454974), commit `c9fb786e086d79225225196a22de5105f6976086`.
+
+- Disposable PostgreSQL 16 provisioning, SSL, restricted `deckverse_app` role and legacy 004/005/006 migration: **PASS**.
+- API/SQL create/join/ready/start, 2/3/4 card counts, all eight stats, hidden decks, database row-lock collisions, manual 2/3/4 consent, stale round and rematch epochs, unanimous rematches and forfeit: **PASS**.
+- Unmodified API/SQL natural heuristic full games completed in **65 rounds (2P), 283 rounds (3P), 156 rounds (4P)**. Reveal expiry was accelerated by mutating **only the disposable fixture**, so match lengths do not represent human gameplay.
+- Separate Chromium contexts connecting to real local API and disposable PostgreSQL passed at 2P, 3P and 4P, including 320px/390px layouts, card concealment, all-N manual acknowledgements and refresh.
+- **Known blocker reproduced:** invalid category and unauthorized category caller return HTTP 503 instead of appropriate client error; `api/game.js` is not modified by this PR.
+
+Local runner timings for that verified run (milliseconds, all per API request; not user-network latency):
+
+| Action | Calls | p50 | p95 | Max |
+|---|---:|---:|---:|---:|
+| Create | 12 | 3.9 | 6.9 | 76.5 |
+| Join | 26 | 4.1 | 7.0 | 7.4 |
+| Start | 33 | 6.3 | 9.8 | 55.8 |
+| Get/snapshot | 177 | 3.0 | 4.8 | 54.7 |
+| Select/turn | 562 | 4.6 | 6.1 | 16.9 |
+| Rematch | 29 | 9.1 | 17.8 | 21.6 |
+| Ack | 18 | 4.3 | 5.9 | 9.2 |
+
+[Baseline CI artifacts](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39453454974/artifacts/12279128884) include the latency JSON and phone screenshots. Later commits add 004 reapplication, chained ties, eliminated-seat skipping and duplicate rematch tests. Consult the **latest** PR workflow status before claiming the expanded suite passed.
