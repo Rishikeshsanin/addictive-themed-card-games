@@ -18,6 +18,7 @@ function syncControls(){
  $('call-dock')?.classList.toggle('minimized',minimized);
 }
 function clearMedia(){
+ for(const el of document.querySelectorAll('#call-dock audio'))el.remove();
  for(const el of ['local-video','remote-video']){const container=$(el);if(!container)continue;container.replaceChildren();if(el==='local-video')container.classList.add('hidden');}
  localMedia=null;
  const placeholder=document.createElement('span');placeholder.textContent='Friend’s video appears here when enabled';$('remote-video')?.appendChild(placeholder);
