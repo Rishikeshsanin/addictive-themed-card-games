@@ -93,4 +93,5 @@ jobs:
 
       - name: Report disposable-only test boundary
         if: success()
-        run: echo "PASS Round5: 8 themes x 2/3/4, rematch, concurrency, host/session recovery; no Supabase connection."
+        run: |
+          echo "PASS Round5: 8 themes x 2/3/4, rematch, concurrency, host/session recovery; no Supabase connection."
