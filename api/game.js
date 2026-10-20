@@ -2,7 +2,7 @@ import postgres from 'postgres';
 import {createHash,randomBytes,randomInt} from 'node:crypto';
 import {newGame,takeTurn,viewFor} from '../src/engine.js';
 import {startMultiGame,multiTurn,multiViewFor} from '../src/multi-engine.js';
-import {DECKS} from '../src/catalog.js';
+import {DECKS,STAT_FIELDS} from '../src/catalog.js';
 import {revealState,revealDeadline,mayAdvance,validateRevealSettings} from '../src/reveal.js';
 import {decideRematch} from '../src/rematch.js';
 import {evaluateRoomPresence} from '../src/presence.js';
@@ -74,7 +74,7 @@ async function create(db,b){
  }throw fail('Could not create room. Please try again.',503);
 }
 async function join(db,b){const c=safeCode(b.code),name=safeName(b.name),raw=secret(),digest=hash(raw);
- await db.begin(async tx=>{const r=await readRoom(tx,c,true);if(r.status!=='lobby')throw fail('This match has already started.');const existing=await tx`select seat,name from deckverse.players where room_id=${r.id} and active=true`;if(existing.length>=playerCountOf(r))throw fail('This room is full.');if(existing.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw fail('Please choose a different nickname.');const seat=Array.from({length:playerCountOf(r)},(_,i)=>i).find(i=>!existing.some(p=>p.seat===i));await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,active,last_seen_at) values(${r.id},${seat},${name},${digest},false,true,now()) on conflict (room_id,seat) do update set name=excluded.name,token_hash=excluded.token_hash,ready=false,active=true,last_seen_at=now()`;});
+ await db.begin(async tx=>{const r=await readRoom(tx,c,true);if(r.status!=='lobby')throw fail('This match has already started.');const existing=await tx`select seat,name from deckverse.players where room_id=${r.id} and active=true`;if(existing.length>=playerCountOf(r))throw fail('This room is full.');if(existing.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw fail('Please choose a different nickname.');const seat=Array.from({length:playerCountOf(r)},(_,i)=>i).find(i=>!existing.some(p=>p.seat===i));await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,active,last_seen_at) values(${r.id},${seat},${name},${digest},false,true,now()) on conflict (room_id,seat) do update set name=excluded.name,token_hash=excluded.token_hash,ready=false,active=true,left_at=null,last_seen_at=now()`;});
  return {...await snapshot(db,c,raw),token:raw};
 }
 async function action(db,b){
@@ -130,6 +130,8 @@ async function action(db,b){
      }
    }else if(b.action==='select'){
      if(room.status!=='playing'||!room.state)throw fail('Match is not active.');
+     if(!STAT_FIELDS.some(stat=>stat.key===b.stat))throw fail('Invalid category.',400);
+     if(room.state.chooser!==me.index)throw fail('Only the current category chooser may play.',403);
      if(presence.paused)throw fail('Match paused while a player reconnects. Your cards are safe.',409);
      if(!Number.isInteger(b.expectedRound)||b.expectedRound!==room.state.round)throw fail('Round has already advanced. Please wait for synchronization.',409);
      const activePolicy=room.state.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
