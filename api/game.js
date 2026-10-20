@@ -10,7 +10,7 @@ const secret=()=>randomBytes(32).toString('hex');
 const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const code=()=>Array.from({length:6},()=>alphabet[randomInt(alphabet.length)]).join('');
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
-const allowedAction=new Set(['create','join','get','ready','start','select','settings','ack','leave']);
+const allowedAction=new Set(['create','join','get','ready','start','rematch','select','settings','ack','leave']);
 let verified=false;
 async function connected(){if(!sql)throw fail('Game rooms are awaiting an isolated database connection. Solo practice is available.',503);if(!verified){const [r]=await sql`select current_user as role`;if(r.role!=='deckverse_app')throw fail('Game backend configuration failed its dedicated-role security check.',503);verified=true;}return sql}
 const safeName=n=>{if(typeof n!=='string'||n.trim().length<2||n.trim().length>24||/[<>]/.test(n))throw fail('Name must be 2–24 characters without HTML symbols.');return n.trim()};
@@ -26,7 +26,7 @@ async function snapshot(db,code,token){
  const me={index:found.seat,name:found.name,ready:found.ready};
  const activePolicy=room.state?.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
  const reveal=room.state?.last?revealState({...activePolicy,until:room.reveal_until,acks:room.reveal_acks}):null;
- const game=room.state?{...viewFor(room.state,me.index),reveal,endReason:room.state.endReason||null}:null;
+ const game=room.state?{...viewFor(room.state,me.index),reveal,endReason:room.state.endReason||null,matchNumber:room.state.matchNumber||1,rematchVotes:room.status==='finished'?rows.filter(p=>p.ready).map(p=>p.seat):[]}:null;
  return {room:{code:room.code,mode:room.mode,status:room.status,revealSettings:{mode:room.reveal_mode,seconds:room.reveal_seconds}},players:rows.map(p=>({index:p.seat,name:p.name,ready:p.ready})),me,game};
 }
 async function create(db,b){
@@ -71,7 +71,23 @@ async function action(db,b){
      const ps=await tx`select seat,ready from deckverse.players where room_id=${room.id} and active=true order by seat`;
      if(ps.length!==2||!ps.every(p=>p.ready))throw fail('Both players must join and be ready.');
      const state=newGame({ids:DECKS[2]});
+     state.matchNumber=1;
+     await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
      await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',updated_at=now() where id=${room.id}`;
+   }else if(b.action==='rematch'){
+     if(room.status!=='finished'||room.state?.status!=='finished')throw fail('A rematch can only begin after the match ends.',409);
+     if(room.state.endReason==='forfeit')throw fail('A player left the match. Create a new room.',409);
+     const ps=await tx`select seat,ready from deckverse.players where room_id=${room.id} and active=true order by seat`;
+     if(ps.length!==2)throw fail('Both original players are needed for a rematch.',409);
+     if(!ps.find(p=>p.seat===me.index)?.ready){
+       await tx`update deckverse.players set ready=true where room_id=${room.id} and seat=${me.index} and active=true`;
+     }
+     if(ps.filter(p=>p.seat!==me.index).every(p=>p.ready)){
+       const state=newGame({ids:DECKS[2]});
+       state.matchNumber=(room.state.matchNumber||1)+1;
+       await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
+       await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',reveal_until=null,reveal_acks='[]'::jsonb,updated_at=now() where id=${room.id}`;
+     }
    }else if(b.action==='select'){
      if(room.status!=='playing'||!room.state)throw fail('Match is not active.');
      if(!Number.isInteger(b.expectedRound)||b.expectedRound!==room.state.round)throw fail('Round has already advanced. Please wait for synchronization.',409);
