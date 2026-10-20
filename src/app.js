@@ -30,7 +30,7 @@ async function checkRoomHealth(){
 }
 function stopPolling(){clearInterval(poll);poll=null;clearTimeout(pollTimer);pollTimer=null;pollBusy=false;}
 function resetReveal(){clearTimeout(revealTimer);revealTimer=null;renderKey='';$('result').classList.add('hidden');}
-function setupScreen(){stopPolling();clearTimeout(botTimer);resetReveal();practice=null;session=null;lobbySnapshot=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
+function setupScreen(){stopPolling();clearTimeout(botTimer);resetReveal();disconnectCall();callHealthChecked=false;practice=null;session=null;lobbySnapshot=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
 function init(){
  $('player-name').value=localStorage.getItem('deckverse_name')||'';
  for(const b of ['top-play','hero-play','pokemon-tile'])$(b).addEventListener('click',setupScreen);
@@ -63,7 +63,7 @@ function init(){
  const room=new URLSearchParams(location.search).get('room');if(room&&/^[a-z0-9]{6}$/i.test(room)){$('join-code').value=room.toUpperCase();mode='remote';document.querySelector('[data-mode="remote"]').click();show('setup');toast('YOU HAVE AN INVITE — ENTER YOUR NAME TO JOIN')}
  try{const saved=JSON.parse(sessionStorage.getItem('deckverse_session')||'null');if(saved?.code&&saved?.token){session=saved;beginPolling();}}catch{}
 }
-function startPractice(){saveName();stopPolling();resetReveal();session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
+function startPractice(){saveName();stopPolling();resetReveal();disconnectCall();callHealthChecked=false;session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
 const API='/api/game';
 async function api(action,body={}){let response;try{response=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})})}catch{throw Error('Cannot connect to the game server. Check your internet connection.')};const data=await response.json().catch(()=>({error:'Unexpected server response'}));if(!response.ok||data.error)throw Error(data.error||'Room request failed');return data}
 async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
@@ -93,7 +93,7 @@ function updateRoom(data){
  sessionStorage.setItem('deckverse_session',JSON.stringify({code:session.code,token:session.token,mode:session.mode,me:session.me}));
  if(data.room.status==='lobby'){if(screen!=='lobby')show('lobby');renderLobby(data);return}
  if(data.room.status==='playing'||data.room.status==='finished'){
-  if(screen!=='battle'){show('battle');resetReveal()}
+  if(screen!=='battle'){show('battle');resetReveal();callHealthChecked=false;}
   renderBattle();
  }
 }
@@ -211,9 +211,5 @@ function scheduleBot(){
   try{practice=takeTurn(practice,1,key);game={...viewFor(practice,0),me:0,practice:true,reveal:{mode:'auto',seconds:2,acks:[],until:new Date(Date.now()+2000).toISOString()}};renderKey='';renderBattle();scheduleBot()}catch(e){toast(e.message)}
  },revealing()?2300:850);
 }
-async function exitGame(){if(session){try{await api('leave',{code:session.code,token:session.token})}catch{}}await leaveCall();stopPolling();clearTimeout(botTimer);resetReveal();practice=null;game=null;session=null;lobbySnapshot=null;try{sessionStorage.removeItem('deckverse_session')}catch{}$('result').classList.add('hidden');show('setup')}
-async function joinCall(){if(!session||session.mode!=='remote'){toast('CALLS ONLY IN REMOTE ROOMS');return}try{const r=await fetch('/api/livekit-token',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:session.code,token:session.token})});const j=await r.json();if(!r.ok)throw Error(j.error||'LiveKit unavailable');const lib=await import('https://esm.sh/livekit-client@2.15.3');call=new lib.Room({adaptiveStream:true,dynacast:true});await call.connect(j.url,j.token);call.on(lib.RoomEvent.TrackSubscribed,(track,pub,participant)=>{if(track.kind==='video'){const video=track.attach();video.autoplay=true;video.playsInline=true;$('remote-video').replaceChildren(video)}else if(track.kind==='audio'){const audio=track.attach();audio.autoplay=true;audio.style.display='none';$('remote-video').append(audio)}});await call.localParticipant.setMicrophoneEnabled(true);$('call-join').classList.add('hidden');for(const id of ['call-mic','call-camera','call-leave'])$(id).classList.remove('hidden');toast('VOICE CONNECTED · CAMERA OPTIONAL')}catch(e){toast(e.message||'COULD NOT JOIN CALL')}}
-async function toggleMic(){if(call){await call.localParticipant.setMicrophoneEnabled(!call.localParticipant.isMicrophoneEnabled);$('call-mic').textContent=call.localParticipant.isMicrophoneEnabled?'🎤':'🔇'}}
-async function toggleCamera(){if(call){try{await call.localParticipant.setCameraEnabled(!call.localParticipant.isCameraEnabled);$('call-camera').textContent=call.localParticipant.isCameraEnabled?'📷':'📷̸'}catch{toast('CAMERA PERMISSION DENIED')}}}
-async function leaveCall(){if(call){await call.disconnect();call=null}$('remote-video').replaceChildren();$('call-join').classList.remove('hidden');for(const id of ['call-mic','call-camera','call-leave'])$(id).classList.add('hidden')}
+async function exitGame(){if(session){try{await api('leave',{code:session.code,token:session.token})}catch{}}await disconnectCall();stopPolling();clearTimeout(botTimer);resetReveal();practice=null;game=null;session=null;callHealthChecked=false;$('battle-settings-panel').classList.add('hidden');lobbySnapshot=null;try{sessionStorage.removeItem('deckverse_session')}catch{}$('result').classList.add('hidden');show('setup')}
 init();
