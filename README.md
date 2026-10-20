@@ -6,7 +6,7 @@
 
 A gorgeous, mobile-first nostalgic trump-card game with themed cards. The homepage displays a Pokémon nostalgia deck plus future theme placeholders; only the Pokémon-inspired theme is playable at this stage. Room modes are Same Room and Remote Room, with optional LiveKit voice and video after server credentials are configured.
 
-## V1 status — accurate, as of 2026-10-20
+## V1.1 status — verified 2026-10-20
 
 | Component | Status |
 | --- | --- |
@@ -15,13 +15,13 @@ A gorgeous, mobile-first nostalgic trump-card game with themed cards. The homepa
 | 2-player rules, Rank lower, other stats higher, pot and second-tie chooser rotation | Implemented, automated tests |
 | Reference Pokémon catalog | 200 entries; 80 cards have tuned game values |
 | Curated deck manifests | 50 for 2, 60 for 3, 80 for 4 |
-| 2-player online rooms and room API | Implemented but **not connected**: dedicated database role still NOLOGIN |
-| App database schema | Isolated `deckverse` inside existing Supabase Project Hub app #16, RLS enabled |
+| 2-player online rooms and room API | **Connected and verified:** 2 independent production mobile browsers + API integration tests |
+| App database schema | Isolated `deckverse` Project Hub app #16, RLS enabled; security advisor reports no DeckVerse findings |
 | Optional LiveKit voice/video | Integration implemented but **not connected**: DeckVerse-specific credentials missing |
 | 3-player / 4-player actual game engine | Planned, not implemented |
 | Rights to publicly distribute Pokémon content | Not secured; fan-demo concept only |
 
-**Do not call this production-complete yet.** The online multiplayer and calling features have never been verified end-to-end against real two-phone users; see [deployment runbook](docs/DEPLOYMENT.md).
+**Verified beta:** Online 1v1, lobby updates and round reveals passed API and dual-mobile-browser automation. Real physical-device network testing, reconnect/rematch hardening, voice/video, and franchise licensing are not yet complete; see [deployment runbook](docs/DEPLOYMENT.md).
 
 ## Rules
 
@@ -38,7 +38,27 @@ A gorgeous, mobile-first nostalgic trump-card game with themed cards. The homepa
 - **50-card active set** comparison-balance objective: each card's overall per-category win score near 50%, no 8-category total domination; automated tests enforce bounds.
 - Fixed 60/80-card subset manifests are prepared for future multiplayer, but the final balance process for 3–4 players is **not complete**.
 - Seeded 2,000-match gameplay simulation (`npm run simulate`) with global-best-percentile chooser: 2,000 finished, no stalled games, median 55 rounds, p90 149 rounds, first chooser match win 59.4%. Heuristic simulation, not a human-play predictor.
-- Core rule tests and actual Chrome desktop/mobile practice smoke run in CI.
+- Core rule tests, Chrome desktop/mobile practice, production API room flow, and two separate mobile-browser sessions run in CI. Production test metrics (one GitHub runner): create 302 ms, join 296 ms, ready 275 ms. The other player's visible lobby state updates via ~550ms polling; mobile latency varies by connection.
+
+## V1.1 reveal options and lobby performance
+
+- Both the winner and loser see the **same two played Pokémon cards** and the correct local-player-first stat comparison.
+- During the reveal, both cards remain face-up and the next category is locked server-side.
+- The room host chooses **Auto 2 seconds (default), 3, 5, 8 seconds** or **Manual** before starting the match.
+- Manual mode requires **both players** to press Continue; a 90-second fallback prevents permanent deadlocks if someone disconnects.
+- The Next Round power passes to the winner (or according to the consecutive-tie rule); no new top card may be played until the reveal closes.
+- Optimistic ready-state feedback, 550ms lobby polling and Mumbai Vercel serverless deployment were introduced. These are improvements, not a claim of zero latency.
+- The game's original eight categories, 50-card deck and balance data are unchanged.
+
+## Next prioritized features
+
+1. **LiveKit:** set up DeckVerse-only LiveKit credentials; integrate real two-device voice/video with permissions, reconnect and audio-only fallback.
+2. **Real-time lobby:** replace polling with secure Realtime notifications or an app-scoped push stream and retain polling as fallback; test latency under load.
+3. **Rematch & presence:** a proper rematch in the same room, app-background recovery, fair host transfer and presence timeout rules.
+4. **Battle polish:** synchronized card-slide/audio/haptics, replay or battle history, accessible countdown animations.
+5. **Configurable gameplay:** allow host to change *future-round* reveal settings during a game without shortening an active reveal; add optional decision timer.
+6. **Three/four-player mode:** implement the actual 60/80-card authoritative engine and multiway ties after re-balancing those decks; manifests alone do not implement multiplayer.
+7. **IP/commercial launch:** obtain permissions or replace trademarked images/names with licensed original content before unrestricted commercial distribution.
 
 ## Run locally
 
