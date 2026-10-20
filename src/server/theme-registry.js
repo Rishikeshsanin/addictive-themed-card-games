@@ -98,7 +98,7 @@ const normalize=(raw)=>{
   })));
   const cards=Object.freeze(raw.cards.map(x=>Object.freeze({
     id:x.id,name:x.name,
-    stats:Object.freeze(Object.fromEntries(categories.map(({key})=>[key,x.stats[key]]))
+    stats:Object.freeze(Object.fromEntries(categories.map(({key})=>[key,x.stats[key]])))
   })));
   const cardById=new Map(cards.map(c=>[c.id,c]));
   const manifests=Object.freeze(Object.fromEntries(
