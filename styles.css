@@ -177,7 +177,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 
 
 /* Round 5: theme selection and CSS-only expansion character treatments. */
-.theme-entry{cursor:pointer;min-height:290px;background:radial-gradient(ellipse at 65% 25%,#7360b966,transparent 62%),#1b1a35}
+.theme-entry{position:relative;display:block;cursor:pointer;min-height:290px;border:1px solid #ffffff21;border-radius:17px;padding:23px;text-align:left;overflow:hidden;isolation:isolate;color:#fff;transition:transform .25s,border-color .25s;background:radial-gradient(ellipse at 65% 25%,#7360b966,transparent 62%),#1b1a35}
 .theme-entry[data-theme-id=avengers]{--theme-tint:#f5ac68;background:radial-gradient(circle at 65% 22%,#f1944a35,transparent 65%),#27202c}
 .theme-entry[data-theme-id=ben10]{--theme-tint:#a2ed73;background:radial-gradient(circle at 65% 22%,#63b84e40,transparent 65%),#172d2b}
 .theme-entry[data-theme-id=shinchan]{--theme-tint:#ffad8e;background:radial-gradient(circle at 65% 22%,#f7847840,transparent 65%),#2b2030}
@@ -234,3 +234,5 @@ body[data-online-theme]:not([data-online-theme=pokemon]) #battle .pot-info{color
 @media(max-width:700px){.theme-grid{grid-template-columns:minmax(0,1fr)!important}.theme-entry{min-height:240px}.theme-entry .theme-glyph{font-size:116px}.theme-choice{padding:8px;min-height:48px;font-size:10px}.theme-choice-icon{flex-basis:24px;height:24px}.theme-picker{gap:7px}}
 @media(max-width:540px){.theme-battle-card .theme-card-stats{gap:4px}.theme-battle-card .theme-card-stat{font-size:8px;padding:5px}.theme-battle-card .theme-card-stat strong{font-size:9px}.multi-arena .theme-battle-card .theme-portrait{min-height:88px;max-height:100px}.multi-arena .theme-battle-card .theme-card-name{font-size:14px}.theme-room-badge{font-size:10px;max-width:100%;text-wrap:balance}}
 @media(prefers-reduced-motion:reduce){.theme-entry,.theme-choice,.theme-battle-card{transition:none!important;animation:none!important}}
+
+.theme-entry:hover{transform:translateY(-6px)}
