@@ -11,14 +11,25 @@ const browser=await chromium.launch({
 });
 const host=await browser.newPage({viewport:{width:390,height:844}});
 const guest=await browser.newPage({viewport:{width:390,height:844}});
-const errors=[];
-for(const [name,p] of [['host',host],['guest',guest]])p.on('pageerror',e=>errors.push(name+': '+e.message));
+const errors=[];const networkFailures=[];
+for(const [name,p] of [['host',host],['guest',guest]]){
+  p.on('pageerror',e=>errors.push(name+': '+e.message.split('\n')[0].slice(0,160)));
+  p.on('requestfailed',req=>{try{const u=new URL(req.url());networkFailures.push(name+': '+u.host+u.pathname.slice(0,90)+' ('+(req.failure()?.errorText||'failed')+')')}catch{}});
+}
 let code,hostToken,guestToken;
 async function api(action,token){
   const r=await fetch(ORIGIN+'/api/game',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,code,token})});return r.json()
 }
 async function waitConnected(page,label){
- await page.waitForFunction(()=>/Voice connected|Connected without mic/.test(document.querySelector('#call-status')?.textContent||''),{timeout:45000});
+ try{await page.waitForFunction(()=>/Voice connected|Connected without mic/.test(document.querySelector('#call-status')?.textContent||''),null,{timeout:35000});}
+ catch(err){
+  const status=await page.locator('#call-status').textContent().catch(()=>'NO STATUS');
+  const toast=await page.locator('#toast').textContent().catch(()=>'NO TOAST');
+  console.error('LiveKit '+label+' did not connect; UI status: '+String(status).slice(0,220)+'; toast: '+String(toast).slice(0,220));
+  console.error('Browser exceptions: '+JSON.stringify(errors));
+  console.error('Failed network requests (no credentials): '+JSON.stringify(networkFailures.slice(-12)));
+  throw err;
+ }
  assert.equal(await page.locator('#call-leave').isVisible(),true,label+' should expose Leave Call');
 }
 try{
