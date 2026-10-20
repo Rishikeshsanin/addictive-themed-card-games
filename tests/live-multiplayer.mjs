@@ -49,10 +49,10 @@ async function run(){
   assert.equal(other.game.reveal.active,true);
   assert.equal(other.game.last.values.length,2);
   // Changing host settings in the middle of a reveal must not alter that reveal.
-  const updated=await call('settings',{...hostAuth,mode:'auto',seconds:5});
-  assert.equal(updated.room.revealSettings.mode,'auto');
-  assert.equal(updated.room.revealSettings.seconds,5);
-  assert.equal(updated.game.reveal.mode,'manual');
+  const futureSetting=await call('settings',{...hostAuth,mode:'auto',seconds:5});
+  assert.equal(futureSetting.room.revealSettings.mode,'auto');
+  assert.equal(futureSetting.room.revealSettings.seconds,5);
+  assert.equal(futureSetting.game.reveal.mode,'manual');
   const unchanged=await call('get',guestAuth);
   assert.equal(unchanged.game.reveal.mode,'manual');
   try{await call('settings',{...guestAuth,mode:'auto',seconds:2});assert.fail('Guest settings change should be forbidden')}
