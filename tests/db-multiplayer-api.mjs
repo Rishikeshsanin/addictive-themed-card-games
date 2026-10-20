@@ -228,7 +228,7 @@ async function suite(n){
    await fixtureHeads(r,hand.heads,hand.field);
    const tied=await choose(r,hand.field);
    assert.equal(tied.last.kind,'tie');assert.ok(tied.pot.length>=n);
-   assert.equal(tied.consecutiveTies,1);
+   assert.equal(tied.consecutiveTies,s.consecutiveTies+1,'Tie counter builds on previously played natural rounds');
    await fastForward(r);
    const won=await choose(r,'rank');
    assert.equal(won.pot.length,0);
