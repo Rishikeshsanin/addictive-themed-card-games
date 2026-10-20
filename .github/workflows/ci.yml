@@ -40,6 +40,11 @@ jobs:
       - name: Two-player production API integration (isolated test room)
         if: github.event_name == 'push'
         run: node tests/live-multiplayer.mjs
+      - name: Two actual mobile browsers see both cards and manual confirmation
+        if: github.event_name == 'push'
+        run: node tests/live-browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
       - name: Save test screenshots
         if: always()
         uses: actions/upload-artifact@v4
