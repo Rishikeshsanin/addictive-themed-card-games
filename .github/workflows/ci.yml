@@ -1,7 +1,7 @@
 name: DeckVerse CI
 on:
   push:
-    branches: [main]
+    branches: [main, integration/livekit-review-ci]
   pull_request:
 jobs:
   engine-tests:
@@ -61,6 +61,12 @@ jobs:
       - name: LiveKit two-browser audio/video smoke (isolated test room)
         if: github.event_name == 'push'
         run: node tests/livekit-browser.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - name: Agent E media lifecycle regression tests
+        run: node tests/livekit-mobile-lifecycle.mjs
+      - name: Agent E synthetic mobile browser media test
+        run: node tests/livekit-mobile-browser.mjs
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - name: Save test screenshots
