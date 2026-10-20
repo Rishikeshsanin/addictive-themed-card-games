@@ -184,8 +184,8 @@ export function themeViewFor(previous,viewer,{roomThemeId}={}){
   const last=previous.last?clone(previous.last):null;
   if(last){
     last.cards=previous.players.length===2?
-      last.cards.map(cardId=>({id:cardId,name:getServerCard(id,cardId).name})):
-      last.cards.map(card=>({seat:card.seat,id:card.id,name:getServerCard(id,card.id).name}));
+      last.cards.map(cardId=>getServerCard(id,cardId)):
+      last.cards.map(card=>({seat:card.seat,...getServerCard(id,card.id)}));
     delete last.awarded; // Never include hidden pot/deck-order attribution.
   }
   const base={version:previous.version,themeId:id,playerCount:previous.playerCount,
