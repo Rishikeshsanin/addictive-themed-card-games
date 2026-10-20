@@ -202,11 +202,11 @@ async function hostRecovery(){
  assert.equal(moved.host_seat,1);
  assert.equal(moved.presence_version>0,true);
  assert.equal(JSON.stringify(moved.state),initial,'Host transfer mutated cards');
- await fail('select',{...login(r,moved.state.chooser),stat:'rank',expectedRound:moved.state.round},409);
- await fail('settings',{...login(r),mode:'auto',seconds:3},403);
- await ok('settings',{...login(r,1),mode:'auto',seconds:3});
+ await fail('select',{...login(r,1),stat:'rank',expectedRound:moved.state.round},409);
  // Reconnect with original token; player membership and cards must be preserved.
  const back=await ok('heartbeat',login(r,0));
+ await fail('settings',{...login(r),mode:'auto',seconds:3},403);
+ await ok('settings',{...login(r,1),mode:'auto',seconds:3});
  assert.equal(back.room.hostSeat,1);
  assert.equal(back.room.paused,false);
  assert.equal(JSON.stringify((await row(r.code)).state),initial);
@@ -284,7 +284,10 @@ try{
   cases,matchEvidence:events,
   latencyMs:Object.fromEntries(Object.entries(sample).map(([k,v])=>[k,stats(v)])),
   totalCalls:Object.values(sample).reduce((a,x)=>a+x.length,0)};
- await fs.writeFile('/tmp/deckverse-db-multiplayer-final-results.json',JSON.stringify(summary,null,2));
+ // Preserve the earlier detailed transactional latency report in the existing CI artifact.
+ const earlier=JSON.parse(await fs.readFile('/tmp/deckverse-db-multiplayer-results.json','utf8'));
+ await fs.writeFile('/tmp/deckverse-db-multiplayer-results.json',
+  JSON.stringify({...earlier,finalRelease:summary},null,2));
  console.log('PASS FINAL RELEASE MULTIPLAYER QA '+JSON.stringify(summary));
 }catch(e){
  console.error('FAIL FINAL RELEASE MULTIPLAYER QA '+(e.stack||String(e)));
