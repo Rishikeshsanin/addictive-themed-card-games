@@ -95,7 +95,7 @@ test('all 8 x 3 manifests contain EXACT unique server-approved card IDs',()=>{
       ranks.add(card.stats.rank);
     }
     assert.throws(()=>{ids[0]=999999},TypeError);
-    assert.deepEqual([...ids],id==='pokemon'?[...DECKS[n]]:[...THEME_PACKS[id].decks[n]]);
+    assert.deepEqual([...ids],themeId==='pokemon'?[...DECKS[n]]:[...THEME_PACKS[themeId].decks[n]]);
     assert.equal(HAND_SIZE_BY_PLAYERS[n]*n,ids.length);
   }
 });
@@ -198,7 +198,7 @@ test('expansion match creation deals unique 50/60/80 cards to 2/3/4 participants
         'opponent upcoming card identity exposed');
     }
     assert.throws(()=>themeViewFor(state,playerCount),/Invalid authenticated/);
-    assert.throws(()=>takeServerThemeTurn(state,1,'rank'),/current category-selection/);
+    assert.throws(()=>takeServerThemeTurn(state,1,'rank'),/category-selection turn/);
     assert.throws(()=>takeServerThemeTurn(state,0,'foreign_stat'),/Unsupported category/);
     assert.throws(()=>takeServerThemeTurn(state,0,'rank',{roomThemeId:'pokemon'}),
       /theme mismatch/);
