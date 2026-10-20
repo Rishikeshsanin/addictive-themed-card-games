@@ -87,6 +87,13 @@ async function createPage(width=390,height=844){
  const context=await browser.newContext({viewport:{width,height},permissions:['camera','microphone'],serviceWorkers:'block'});
  const page=await context.newPage(),errors=[];
  page.on('pageerror',err=>errors.push(err.message.slice(0,180)));
+ // Allow loopback application only; all third-party image/font requests are blocked.
+ // A separate per-page fake SDK route in callTests intentionally fulfills the SDK request.
+ await page.route('**/*',route=>{
+  const host=new URL(route.request().url()).hostname;
+  if(host==='127.0.0.1')return route.continue();
+  return route.abort();
+ });
  await page.goto(origin,{waitUntil:'domcontentloaded'});
  await page.locator('#pokemon-tile').click();
  return {page,context,errors};
@@ -183,9 +190,9 @@ async function callTests(host,guest){
  await p.locator('#call-audio').click();
  assert.equal(await p.evaluate(()=>window.__qaRooms[0].canPlayAudio),true);
  await p.locator('#call-mic').click();
- assert.equal(await p.evaluate(()=>window.__qaRooms[0].localParticipant.isMicrophoneEnabled),false);
+ await p.waitForFunction(()=>window.__qaRooms[0].localParticipant.isMicrophoneEnabled===false);
  await p.locator('#call-mic').click();
- assert.equal(await p.evaluate(()=>window.__qaRooms[0].localParticipant.isMicrophoneEnabled),true);
+ await p.waitForFunction(()=>window.__qaRooms[0].localParticipant.isMicrophoneEnabled===true);
  await p.locator('#call-camera').click();
  await p.waitForFunction(()=>window.__qaRooms[0].localParticipant.isCameraEnabled);
  await p.locator('#call-minimize').click();
@@ -227,7 +234,7 @@ async function run(){
     }
    }
    record(`${count}P browser room creation, joining, readiness, start and card secrecy`,true,{roomSize:count,classification:'disposable PostgreSQL + synthetic Chromium'});
-   await screenshot(clients[0].page,`started-${count}p-${sizes[0].width}`);
+   for(let i=0;i<clients.length;i++) await screenshot(clients[i].page,`started-${count}p-${sizes[i].width}`);
    await sessionRoundtrip(clients[0],host);
    record(`${count}P offline/online/refresh preserves seats and cards`,true,{classification:'disposable PostgreSQL + synthetic Chromium'});
    if(count===2){
