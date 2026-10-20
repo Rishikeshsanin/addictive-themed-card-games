@@ -1,8 +1,9 @@
 import {STAT_FIELDS,DECKS,deckFor,card,art} from './catalog.js';
 import {newGame,takeTurn,viewFor,secureIndex} from './engine.js';
+import {initCallControls,disconnectCall,getCallAvailability} from './livekit-call.js';
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let screen='landing',mode='same',session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
-let pollBusy=false,actionBusy=false,readyBusy=false,pollTimer=null,revealTimer=null,renderKey='',lobbySnapshot=null;
+let pollBusy=false,actionBusy=false,readyBusy=false,pollTimer=null,revealTimer=null,renderKey='',lobbySnapshot=null,callHealthChecked=false;
 const symbols={rank:'♛',height:'↕',weight:'◆',attack:'⚔',defense:'⬡',speed:'⚡',energy:'✧',hp:'♥'};
 const elements=['landing','setup','lobby','battle'];
 function show(id){screen=id;for(const el of elements)$(el).classList.toggle('hidden',el!==id);if(id!=='landing')window.scrollTo(0,0);if(id==='landing')location.hash='';if(id==='setup')checkRoomHealth();}
