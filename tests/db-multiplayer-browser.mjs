@@ -97,7 +97,11 @@ try{
     assert.ok(bounds.overflow<=2,JSON.stringify(bounds));
     if(n>2)assert.ok(bounds.width>=230,'Phone-size card must not be unreadably narrow: '+JSON.stringify(bounds));
    }
-   await pages[row.state.chooser].locator('.stat-button:not([disabled])').first().click();
+   const chooserPage=pages[row.state.chooser];
+   await chooserPage.locator('.stat-button:not([disabled])').first().click();
+   // The Playwright click is not a promise for the fetch()/SQL transaction.
+   // Wait for the real API snapshot to reveal the round before querying storage.
+   await chooserPage.locator('#result.compact').waitFor({state:'visible',timeout:12000});
    row=await gameRow(code);
    assert.equal(row.state.round,1);
    for(let i=0;i<n;i++){
