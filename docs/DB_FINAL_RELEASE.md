@@ -3,7 +3,7 @@
 **Branch:** `agent/a-final-migration-safety`  
 **Target:** `integration/deckverse-v2-release-hardening`  
 **Audited baseline:** `4e74e8d0307382f6de09bb5afa503a7def6ec1fe`  
-**Release verdict:** **NO-GO for the live Hub until explicit approval, successful staged backup restoration and final integration signoff**. Approval of this draft PR **does not** authorize live SQL or deployment.
+**Release verdict:** **NO-GO for the live Hub until explicit approval, a restore drill using an authorized app-scoped real backup in isolated staging, PostgreSQL 17 compatibility confirmation, and final integration signoff**. Approval of this draft PR **does not** authorize live SQL or deployment.
 
 ## Boundaries and evidence
 
@@ -88,7 +88,9 @@ Measured checks run only against that throwaway instance:
 5. Restore the backed-up **pre-migration V1 snapshot** into a distinct newly created disposable database (`deckverse_restore`) via `pg_restore`, never the source DB. Compare the *exact* original room/player digest, original 0/1 seat constraint, counts and absence of V2 tables. This proves a realistic schema+data restore in that fixture, not a production restore procedure or live-PITR guarantee.
 6. Always stop the disposable server and remove temporary backups/data in a `finally` block; no database artifacts leave the runner.
 
-The older test `tests/db-migration-audit-rehearsal.test.js` independently verifies source preservation; both must remain green. CI must show the **real PG test executed, not skipped**. Record workflow URL, tests/failures/skips and server version here after successful execution; do not mark the backup/restore gate as passed merely because this plan exists.
+The older test `tests/db-migration-audit-rehearsal.test.js` independently verifies source preservation; **both executed** in [DeckVerse CI run 39460320712](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39460320712): **96 tests passed, 0 failed, 0 skipped**. The runner reported **PostgreSQL 16.15 (Ubuntu 16.15-1.pgdg24.04+2)** and emitted `DISPOSABLE_BACKUP_RESTORE_PASS`, after applying 004/005/006 twice and verifying V1 restoration against the pre-migration original-row digest. The room-lock rehearsal exercised the bounded lock timeout. This is real PostgreSQL behavior in a fictional local cluster, **not a restore of live Supabase data**.
+
+Two independent disposable PostgreSQL 16 lanes also passed on the identical migration commit: [real multiplayer/API/mobile-browser QA run 39460320725](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39460320725) completed organic 2P/3P/4P API/SQL full matches (133/72/216 accelerated rounds) and SQL-backed Chrome 2P/3P/4P mobile-browser lobby/reveal/reconnect flows; [presence validation run 39460320730](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39460320730) passed **15/15** tests, zero skipped. These are synthetic/disposable tests, **not** verification against the actual PG17.6 Hub, physical phones, or a copied production dataset.
 
 ## Preconditions: exact controlled deployment checklist
 
