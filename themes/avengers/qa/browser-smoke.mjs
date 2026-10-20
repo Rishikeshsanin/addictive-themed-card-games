@@ -35,6 +35,12 @@ try{
   await page.waitForTimeout(2800);
   assert.ok(await page.locator('#arena:not(.hidden)').isVisible());
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
+  if(overflow>2){
+    const offenders=await page.evaluate(()=>Array.from(document.querySelectorAll('*')).map(el=>{
+      const r=el.getBoundingClientRect();return {tag:el.tagName,id:el.id,cls:typeof el.className==='string'?el.className.slice(0,55):'',left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width)};
+    }).filter(x=>x.right>innerWidth+3||x.left<-3).slice(0,15));
+    console.error('Mobile overflow elements',JSON.stringify(offenders));
+  }
   assert.ok(overflow<=2,'Horizontal viewport overflow on '+width+'px: '+overflow);
   assert.deepEqual(errors,[],'No browser JavaScript exceptions at '+width+'px');
   await page.screenshot({path:'/tmp/deckverse-avengers-'+width+'.png',fullPage:true});
