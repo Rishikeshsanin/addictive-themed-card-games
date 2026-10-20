@@ -21,13 +21,16 @@ export function startMultiGame({playerCount,ids=DECKS[playerCount],picker=secure
 }
 export function validateMulti(s){
  assert(s&&supportedPlayers.includes(s.playerCount),'Invalid player count');
+ assert(s.total===s.playerCount*20,'Invalid configured deck total');
+ assert(s.status==='playing'||s.status==='finished','Invalid match status');
+ assert(Number.isSafeInteger(s.round)&&s.round>=0,'Invalid round counter');
  assert(s.players?.length===s.playerCount,'Wrong roster length');
  assert(s.players.every(p=>Array.isArray(p.deck))&&Array.isArray(s.pot),'Missing decks');
  const all=[...s.players.flatMap(p=>p.deck),...s.pot];
  assert(all.length===s.total,'Card conservation violated');
  assert(new Set(all).size===all.length,'Duplicate card in game');
  assert(all.every(id=>card(id)),'Unknown card');
- assert(s.chooser>=0&&s.chooser<s.playerCount,'Bad chooser');
+ assert(Number.isInteger(s.chooser)&&s.chooser>=0&&s.chooser<s.playerCount,'Bad chooser');
  assert(Number.isInteger(s.consecutiveTies)&&s.consecutiveTies>=0,'Invalid tie count');
  if(s.status==='finished')assert(Number.isInteger(s.winner)&&s.winner>=0&&s.winner<s.playerCount,'Invalid winner');
  return true;
@@ -37,6 +40,7 @@ export function multiTurn(input,actor,key){
  const rule=validStat(key);
  assert(rule,'Invalid category');
  assert(actor===input.chooser,'Not your category-selection turn');
+ validateMulti(input);
  const s=copy(input),seats=activeSeats(s);
  assert(seats.length>=2,'At least two competing decks are required');
  assert(seats.includes(actor),'Chooser has no cards');
@@ -73,5 +77,5 @@ export function multiViewFor(state,seat){
  validateMulti(state);
  assert(Number.isInteger(seat)&&seat>=0&&seat<state.playerCount,'Invalid viewer');
  const own=state.players[seat].deck, last=state.last;
- return {version:state.version,playerCount:state.playerCount,status:state.status,round:state.round,chooser:state.chooser,winner:state.winner,me:seat,counts:state.players.map(p=>p.deck.length),pot:state.pot.length,consecutiveTies:state.consecutiveTies,topCard:own.length?card(own[0]):null,last:last?{...last,cards:last.cards.map(x=>({...x,name:card(x.id).name}))}:null,total:state.total};
+ return {version:state.version,playerCount:state.playerCount,status:state.status,round:state.round,chooser:state.chooser,winner:state.winner,me:seat,counts:state.players.map(p=>p.deck.length),pot:state.pot.length,consecutiveTies:state.consecutiveTies,topCard:own.length?card(own[0]):null,last:last?{...copy(last),cards:last.cards.map(x=>({seat:x.seat,id:x.id,name:card(x.id).name}))}:null,total:state.total};
 }
