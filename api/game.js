@@ -84,7 +84,8 @@ async function action(db,b){
      await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',updated_at=now() where id=${room.id}`;
    }else if(b.action==='rematch'){
      const ps=await tx`select seat,ready from deckverse.players where room_id=${room.id} and active=true order by seat`;
-     const decision=decideRematch({status:room.status,state:room.state,players:ps,seat:me.index});
+     if(!Number.isSafeInteger(b.expectedMatchNumber))throw fail('Rematch request needs the current match number. Refresh and retry.',409);
+     const decision=decideRematch({status:room.status,state:room.state,players:ps,seat:me.index,expectedMatchNumber:b.expectedMatchNumber});
      if(decision.error)throw fail(decision.error,409);
      if(!ps.find(p=>p.seat===me.index)?.ready){
        await tx`update deckverse.players set ready=true where room_id=${room.id} and seat=${me.index} and active=true`;
