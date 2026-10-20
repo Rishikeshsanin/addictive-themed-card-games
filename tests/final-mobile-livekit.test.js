@@ -146,6 +146,7 @@ function fakeSdk(){
  }`;
 }
 let activeBrowser;
+const releaseFindings=[];
 async function openClient(browser,fixture,size){
  const context=await browser.newContext({viewport:size,permissions:['camera','microphone'],
   serviceWorkers:'block',deviceScaleFactor:1});
@@ -201,7 +202,11 @@ async function measure(page,stage,players,width){
  });
  assert.ok(report.scrollX<=2,`${stage} ${players}P ${width}px horizontal scroll: ${JSON.stringify(report)}`);
  assert.equal(report.clipped.length,0,`${stage} ${players}P ${width}px clipped controls: ${JSON.stringify(report)}`);
- assert.equal(report.blockedPlayableButtons,0,`${stage} ${players}P ${width}px call overlay blocks cards`);
+ if(report.blockedPlayableButtons>0){
+  const finding={stage,players,width,blocked:report.blockedPlayableButtons};
+  releaseFindings.push(finding);
+  console.error('QA_RELEASE_BLOCKER='+JSON.stringify(finding));
+ }
  return report;
 }
 async function waitFor(page,fn){await page.waitForFunction(fn,null,{timeout:11000})}
@@ -343,7 +348,9 @@ test('LiveKit synthetic camera/mic permissions, calls, cleanup, visibility and r
    await p.locator('#local-video video').waitFor({state:'visible'});
    for(const size of [{width:320,height:720},{width:390,height:844},{width:768,height:1024},{width:1366,height:900}]){
     await p.setViewportSize(size);
-    await measure(p,'expanded call',2,size.width);
+    const overlap=await measure(p,'expanded call',2,size.width);
+    if(overlap.blockedPlayableButtons>0)
+     await p.screenshot({path:'/tmp/deckverse-final-call-overlap-'+size.width+'.png',fullPage:true});
     assert.equal(await p.locator('#call-join').count(),1);
    }
    // Remote subscription duplication and listener/media cleanup are simulated; not a true WebRTC peer.
@@ -396,7 +403,8 @@ test('LiveKit synthetic camera/mic permissions, calls, cleanup, visibility and r
    assert.equal(await p.evaluate(()=>window.__qaRooms?.length||0),0,'refresh must not reactivate capture');
    assert.deepEqual(client.errors,[],'Call media browser page errors');
    await p.screenshot({path:'/tmp/deckverse-final-livekit-390.png',fullPage:true});
-   console.log('PASS synthetic LiveKit denied→allowed mic/camera, audio unlock, visibility, reconnect, duplicate-track guard, repeated leave cleanup and four widths');
+   console.log('PASS synthetic LiveKit denied→allowed mic/camera, audio unlock, visibility, reconnect, duplicate-track guard and repeated leave cleanup');
+   assert.deepEqual(releaseFindings,[],'Expanded call overlay blocked enabled stat buttons; coordinator CSS fix required');
   }finally{await client.context.close();}
  }finally{await browser.close();await new Promise(ok=>server.close(ok));}
 });
