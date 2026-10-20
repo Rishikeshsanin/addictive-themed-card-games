@@ -8,7 +8,7 @@ import {spawnSync,spawn} from 'node:child_process';
 import {mkdtempSync,mkdirSync,rmSync,readdirSync,existsSync,accessSync,constants,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const migrations=['004_multiplayer_rooms.sql','005_deckverse_rate_limits.sql','006_deckverse_presence.sql'];
+const migrations=['004_multiplayer_rooms.sql','005_deckverse_rate_limits.sql','006_deckverse_presence.sql','007_theme_rooms.sql'];
 function binaryDirectory(){
  let dirs=(process.env.PATH||'').split(path.delimiter);
  if(existsSync('/usr/lib/postgresql'))dirs=[

@@ -3,7 +3,7 @@
  * disposable PostgreSQL 16; no mocked API or remote service.
  *
  * The existing db-multiplayer-check workflow provisions a fictional pre-V2 room and
- * applies migrations 004/005/006 before calling this file from db-multiplayer-browser.
+ * applies migrations 004/005/006/007 before calling this file from db-multiplayer-browser.
  * HTTP uses distinct 127/8 loopback source addresses for accelerated games so the
  * independently tested per-IP rate limiter does not make long simulations invalid.
  * NEVER run with a real Supabase URL, password or database.
@@ -258,7 +258,7 @@ async function migrationParity(){
   'players:left_at','rate_limit_counters:key_hash']){
   assert.ok(columns.some(c=>c.table_name+':'+c.column_name===key),'Missing migrated column '+key);
  }
- cases.push('Legacy 2P preservation + 004/005/006 columns, seat expansion and RLS');
+ cases.push('Legacy 2P preservation + 004/005/006/007 columns, theme default, seat expansion and RLS');
 }
 function stats(arr){
  const sorted=[...arr].sort((a,b)=>a-b);

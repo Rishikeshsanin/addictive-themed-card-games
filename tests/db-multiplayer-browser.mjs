@@ -42,8 +42,19 @@ await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(4
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/google-chrome',
  args:['--no-sandbox','--disable-dev-shm-usage']});
 const problems=[];
-async function gameRow(code){const [r]=await sql`select status,state from deckverse.rooms where code=${code}`;assert.ok(r);return r}
+async function gameRow(code){const [r]=await sql`select status,state,theme_id from deckverse.rooms where code=${code}`;assert.ok(r);return r}
 try{
+ for(const width of [320,390,768,1440]){
+  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'});
+  const page=await context.newPage();await page.goto(host,{waitUntil:'domcontentloaded'});
+  assert.equal(await page.locator('[data-theme-id]').count(),8);
+  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth);
+  assert.ok(overflow<=2,'Theme picker overflows at '+width+'px by '+overflow+'px');
+  await page.locator('[data-theme-id="cricket"]').click();
+  assert.equal(await page.locator('#selected-theme-name').textContent(),'CRICKET LEGENDS');
+  await context.close();
+ }
+ const browserTheme={2:'pokemon',3:'avengers',4:'fantasy'};
  for(const n of [2,3,4]){
   const contexts=[],pages=[],pageErrors=[];
   try{
@@ -54,7 +65,7 @@ try{
     const page=await context.newPage();pages.push(page);
     page.on('pageerror',err=>pageErrors.push({seat:i,message:err.message}));
     await page.goto(host,{waitUntil:'domcontentloaded'});
-    await page.locator('#pokemon-tile').click();
+    await page.locator('[data-theme-id="'+browserTheme[n]+'"]').click();
     await page.locator('#player-name').fill('Database QA '+i);
     await page.waitForFunction(()=>!document.querySelector('#create-room').disabled);
    }
@@ -80,6 +91,7 @@ try{
     assert.equal(await pages[i].locator('.stat-button').count(),8);
    }
    let row=await gameRow(code);
+   assert.equal(row.theme_id,browserTheme[n]);
    assert.equal(row.state.total,n===2?50:n*20);
    assert.equal(row.state.players.length,n);
    assert.deepEqual(row.state.players.map(x=>x.deck.length),Array(n).fill(n===2?25:20));
@@ -133,7 +145,7 @@ try{
    else await pages[0].locator('#multi-arena .multi-player').first().waitFor({timeout:10000});
    assert.equal((await gameRow(code)).state.round,1);
    assert.deepEqual(pageErrors,[],JSON.stringify(pageErrors));
-   console.log('PASS real SQL-backed '+n+'P Chromium browser lobby, private cards, shared reveal, N acknowledgements, mobile layout and refresh');
+   console.log('PASS real SQL-backed '+browserTheme[n]+' '+n+'P Chromium browser lobby, private cards, shared reveal, N acknowledgements, mobile layout and refresh');
   }catch(error){problems.push({n,error:error.stack||String(error)});throw error}
   finally{for(const context of contexts)await context.close()}
  }
