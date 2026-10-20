@@ -131,12 +131,12 @@ async function action(db,b){
    }else if(b.action==='select'){
      if(room.status!=='playing'||!room.state)throw fail('Match is not active.');
      if(!STAT_FIELDS.some(stat=>stat.key===b.stat))throw fail('Invalid category.',400);
-     if(room.state.chooser!==me.index)throw fail('Only the current category chooser may play.',403);
      if(presence.paused)throw fail('Match paused while a player reconnects. Your cards are safe.',409);
      if(!Number.isInteger(b.expectedRound)||b.expectedRound!==room.state.round)throw fail('Round has already advanced. Please wait for synchronization.',409);
      const activePolicy=room.state.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
      const display=revealState({...activePolicy,required:playerCountOf(room),until:room.reveal_until,acks:room.reveal_acks});
      if(!mayAdvance(display))throw fail('The previous card reveal is still in progress.',409);
+     if(room.state.chooser!==me.index)throw fail('Only the current category chooser may play.',403);
      const state=playerCountOf(room)===2?takeTurn(room.state,me.index,b.stat):multiTurn(room.state,me.index,b.stat);
      state.revealPolicy={mode:room.reveal_mode,seconds:room.reveal_seconds};
      const until=revealDeadline(state.revealPolicy);
