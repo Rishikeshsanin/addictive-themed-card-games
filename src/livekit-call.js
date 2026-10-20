@@ -10,6 +10,7 @@ const notify=()=>{};
 function syncControls(){
  const connected=Boolean(room);
  button('call-join',!connected);for(const id of ['call-mic','call-camera','call-leave'])button(id,connected);
+ button('call-audio',Boolean(room&&!room.canPlayAudio));
  button('call-flip',Boolean(room?.localParticipant?.isCameraEnabled));
  if($('call-join'))$('call-join').disabled=busy;
  if($('call-mic')){$('call-mic').textContent=room?.localParticipant.isMicrophoneEnabled?'🎤':'🔇';$('call-mic').title=room?.localParticipant.isMicrophoneEnabled?'Mute microphone':'Unmute microphone'}
@@ -33,7 +34,7 @@ function bindEvents(newRoom,lib,epoch){
  newRoom.on(lib.RoomEvent.Reconnecting,()=>{if(activeEpoch===epoch)status('Reconnecting call… the cards keep working')});
  newRoom.on(lib.RoomEvent.Reconnected,()=>{if(activeEpoch===epoch)status('Voice connected · your game continues')});
  newRoom.on(lib.RoomEvent.Disconnected,()=>{if(activeEpoch!==epoch)return;room=null;clearMedia();syncControls();status('Call disconnected · tap Join Voice to reconnect')});
- newRoom.on(lib.RoomEvent.AudioPlaybackStatusChanged,()=>{if(!newRoom.canPlayAudio)status('Tap Join Voice again if your browser blocked audio playback')});
+ newRoom.on(lib.RoomEvent.AudioPlaybackStatusChanged,()=>{if(activeEpoch!==epoch)return;if(!newRoom.canPlayAudio)status('Tap ENABLE AUDIO to hear your friend');else status('Voice audio is available');syncControls();});
 }
 export async function getCallAvailability(){
  try{const r=await fetch('/api/livekit-token',{cache:'no-store'});const j=await r.json();return Boolean(r.ok&&j.configured)}catch{return false}
@@ -61,6 +62,12 @@ export async function connectCall(getSession,showToast){
   if(connecting){try{await connecting.disconnect()}catch{}}
   room=null;clearMedia();status(e.message||'Call could not connect');showToast(e.message||'CALL UNAVAILABLE — THE GAME STILL WORKS');syncControls();
  }finally{busy=false;syncControls()}
+}
+export async function enableCallAudio(showToast){
+ if(!room)return;
+ try{await room.startAudio();status(room.canPlayAudio?'Audio playback enabled':'Audio is still blocked; check device sound permissions');}
+ catch{showToast('TAP TO ENABLE SOUND OR CHECK BROWSER PERMISSIONS');status('Audio playback unavailable — gameplay continues');}
+ syncControls();
 }
 export async function toggleMicCall(showToast){
  if(!room||busy)return;busy=true;try{await room.localParticipant.setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled);status(room.localParticipant.isMicrophoneEnabled?'Microphone on':'Microphone muted')}catch(e){showToast('MICROPHONE PERMISSION REQUIRED')}finally{busy=false;syncControls()}
@@ -93,6 +100,7 @@ export function minimizeCall(){minimized=!minimized;syncControls()}
 export function initCallControls(getSession,showToast){
  $('call-join').onclick=()=>connectCall(getSession,showToast);
  $('call-leave').onclick=()=>disconnectCall();
+ $('call-audio').onclick=()=>enableCallAudio(showToast);
  $('call-mic').onclick=()=>toggleMicCall(showToast);
  $('call-camera').onclick=()=>toggleCameraCall(showToast);
  $('call-flip').onclick=()=>flipCameraCall(showToast);
