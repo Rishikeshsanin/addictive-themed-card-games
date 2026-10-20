@@ -45,3 +45,6 @@ try{
   await ctx.close();
  }
 }finally{await browser.close()}
+
+// Independent multi-client rematch, reconnect and consent simulation.
+await import('./multi-rematch-browser.mjs');

@@ -77,7 +77,7 @@ const API='/api/game';
 async function api(action,body={}){let response;try{response=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})})}catch{throw Error('Cannot connect to the game server. Check your internet connection.')};const data=await response.json().catch(()=>({error:'Unexpected server response'}));if(!response.ok||data.error)throw Error(data.error||'Room request failed');return data}
 async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code,playerCount:roomSize});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
 async function roomAction(action,params={}){
- if(!session)return false;
+ if(!session||actionBusy)return false;
  actionBusy=true;
  try{const data=await api(action,{code:session.code,token:session.token,...params});updateRoom(data);return true}
  catch(e){toast(e.message);return false}
@@ -121,7 +121,7 @@ function renderLobby(data){
  control.value=settings.mode+'-'+settings.seconds;
  control.disabled=!host;
  $('reveal-owner').textContent=host?'YOU ARE THE HOST':'ONLY THE HOST CAN EDIT';
- $('reveal-help').textContent=settings.mode==='manual'?'Both players tap Continue after a reveal (90-second fallback).':`Cards are revealed to BOTH players for ${settings.seconds} seconds.`;
+ $('reveal-help').textContent=settings.mode==='manual'?`All ${count} players tap Continue after a reveal (90-second fallback).`:`Played cards are revealed to all ${count} players for ${settings.seconds} seconds.`;
 }
 function beginPolling(){
  stopPolling();const epoch=pollEpoch;let fetching=false;
@@ -154,12 +154,20 @@ function beginPolling(){
  sync();
 }
 function playerName(i){if(practice)return i===0?displayName():'RIVAL BOT';return session?.players?.find(x=>x.index===i)?.name||('PLAYER '+(i+1))}
+function ensureCallAvailability(){
+ if(session?.mode!=='remote'||callHealthChecked)return;
+ callHealthChecked=true;
+ getCallAvailability().then(ok=>{
+  if(!session||session.mode!=='remote')return;
+  if(!ok){$('call-status').textContent='Calling requires DeckVerse LiveKit setup';$('call-note').textContent='Voice/video is not connected yet; the card game remains playable.';}
+ }).catch(()=>{});
+}
 function revealing(){
  const r=game?.reveal;
  if(!game?.last||!r?.until||game?.endReason==='forfeit')return false;
  const deadline=Date.parse(r.until);
  if(!Number.isFinite(deadline)||Date.now()>=deadline)return false;
- return r.mode!=='manual'||(r.acks?.length||0)<2;
+ return r.mode!=='manual'||(r.acks?.length||0)<(r.required||game.playerCount||2);
 }
 function queueRevealRefresh(){
  clearTimeout(revealTimer);revealTimer=null;
@@ -174,13 +182,14 @@ function showMultiRoundResult(last,me){
  const tie=last.kind==='tie';
  const ownWin=winner===me;
  const title=tie?'THE CARDS GO TO THE JACKPOT':ownWin?'YOU WON THE ROUND!':winner===null?'ROUND RESOLVED':escapeHtml(playerName(winner))+' WINS THE ROUND!';
+ const detail=tie?'All played cards are held aside.':last.kind==='sudden-death'?'Rank settled the exhausted-deck tie.':last.kind==='last-standing'?'Only one player had cards left after the tie.':'Cards move to the winning deck.';
  const rows=last.cards.map((played,i)=>{
   const character=card(played.id);
   return '<span>'+escapeHtml(playerName(played.seat))+' · '+escapeHtml(character?.name||'CARD')+' <b>'+Number(last.values[i]).toLocaleString(undefined,{maximumFractionDigits:2})+'</b></span>';
  }).join('');
  const manual=game.reveal?.mode==='manual',acked=game.reveal?.acks?.includes(me);
  $('result').className='result-pop compact '+(tie?'tie':ownWin?'win':'loss');
- $('result').innerHTML='<div class="reveal-summary"><h3>'+title+'</h3><p>'+escapeHtml(last.stat.toUpperCase())+' · '+(tie?'All played cards are held aside.':'Cards move to the winning deck.')+'</p><div class="multi-result-values">'+rows+'</div></div><div class="reveal-action">'+(manual?'<button id="round-continue" class="btn btn-primary" '+(acked?'disabled':'')+'>'+(acked?'✓ READY':'CONTINUE →')+'</button>':'<span class="reveal-countdown">NEXT ROUND IN '+Math.max(0,Math.ceil((Date.parse(game.reveal.until)-Date.now())/1000))+'s</span>')+'</div>';
+ $('result').innerHTML='<div class="reveal-summary"><h3>'+title+'</h3><p>'+escapeHtml(last.stat.toUpperCase())+' · '+detail+'</p><div class="multi-result-values">'+rows+'</div></div><div class="reveal-action">'+(manual?'<button id="round-continue" class="btn btn-primary" '+(acked?'disabled':'')+'>'+(acked?'✓ READY':'CONTINUE →')+'</button>':'<span class="reveal-countdown">NEXT ROUND IN '+Math.max(0,Math.ceil((Date.parse(game.reveal.until)-Date.now())/1000))+'s</span>')+'</div>';
  $('result').classList.remove('hidden');
  if(manual&&!acked)$('round-continue').onclick=async()=>{
   const button=$('round-continue');button.disabled=true;button.textContent='CONFIRMING…';
@@ -189,7 +198,7 @@ function showMultiRoundResult(last,me){
 }
 function renderMultiBattle(){
  const count=game.playerCount,me=game.me,ended=game.status==='finished'||game.status==='aborted',active=revealing(),last=game.last;
- const signature=['multi',game.matchNumber||1,game.round,game.status,game.chooser,game.counts.join(','),game.pot,active,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
+ const signature=['multi',game.matchNumber||1,game.round,game.status,game.chooser,game.counts.join(','),game.pot,active,(game.rematchVotes||[]).join(','),game.last?.kind||'',game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
  if(renderKey===signature)return;
  renderKey=signature;
  document.querySelector('#battle .battle-meta').classList.add('hidden');
@@ -211,6 +220,7 @@ function renderMultiBattle(){
  $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>play(b.dataset.stat));
  $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
  $('call-dock').classList.toggle('hidden',session?.mode!=='remote');
+ ensureCallAvailability();
  const host=session?.me.index===0;
  $('battle-settings-open').classList.toggle('hidden',!host||ended);
  if(!host||ended)$('battle-settings-panel').classList.add('hidden');
@@ -229,7 +239,7 @@ function renderBattle(){
  $('multi-arena').classList.add('hidden');
  const me=practice?0:game.me,enemy=1-me,own=game.topCard;
  const active=revealing(),ended=game.status==='finished';
- const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
+ const signature=[game.matchNumber||1,game.round,active,ended,(game.rematchVotes||[]).join(','),game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
  if(renderKey===signature)return;
  renderKey=signature;
  $('round-number').textContent=String(game.round+(active?0:ended?0:1)).padStart(2,'0');
@@ -266,20 +276,20 @@ function renderBattle(){
  queueRevealRefresh();
 }
 function showFinalResult(me){
- const forfeit=game.endReason==='forfeit',win=game.winner===me;
+ const forfeit=game.endReason==='forfeit'||game.endReason==='player_left'||game.status==='aborted',win=game.winner===me;
  const wantsRematch=game.rematchVotes?.includes(me);
  const votes=game.rematchVotes?.length||0;
  const expected=game.playerCount||2;
  const rematchAvailable=Boolean(session&&!forfeit&&session.players?.length===expected);
  const action=practice?'REMATCH THE BOT ↗':rematchAvailable?(wantsRematch?'✓ REMATCH REQUESTED':'⚡ PLAY AGAIN — REMATCH ↗'):'BACK TO ROOMS ↗';
  $('result').className='result-pop final '+(win?'win':'loss');
- $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED BY FORFEIT'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':game.total+' CARDS · ONE LEGEND')+' · MATCH '+(game.matchNumber||1)+'</p><button class="btn btn-primary" id="play-again" '+(wantsRematch?'disabled':'')+'>'+action+'</button>'+(rematchAvailable?'<small class="rematch-status">'+(wantsRematch?'Waiting for the others to agree…':votes+'/'+expected+' players requested a rematch')+'</small>':'');
+ $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED EARLY'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':game.total+' CARDS · ONE LEGEND')+' · MATCH '+(game.matchNumber||1)+'</p><button class="btn btn-primary" id="play-again" '+(wantsRematch?'disabled':'')+'>'+action+'</button>'+(rematchAvailable?'<small class="rematch-status">'+(wantsRematch?'Waiting for the others to agree…':votes+'/'+expected+' players requested a rematch')+'</small>':'');
  $('result').classList.remove('hidden');
  $('play-again').onclick=async()=>{
   if(practice)return startPractice();
   if(!rematchAvailable)return exitGame();
   const b=$('play-again');b.disabled=true;b.textContent='REQUESTING REMATCH…';
-  const ok=await roomAction('rematch');
+  const ok=await roomAction('rematch',{expectedMatchNumber:game.matchNumber||1});
   if(!ok&&game?.status==='finished'){b.disabled=false;b.textContent=action}
  };
 }
