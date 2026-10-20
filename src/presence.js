@@ -8,6 +8,15 @@ export const DEFAULT_PRESENCE_POLICY = Object.freeze({
   graceMs: Object.freeze({lobby: 2 * MINUTE, playing: 5 * MINUTE, finished: 3 * MINUTE}),
   abandonedMs: Object.freeze({lobby: 30 * MINUTE, playing: 24 * 60 * MINUTE, finished: 30 * MINUTE}),
 });
+// Accessible retention is finite. Historic rows are retained for a separately
+// authorized archival/purge process. These TTLs match abandonedMs by phase.
+export const ROOM_RETENTION_SECONDS = Object.freeze({
+  lobby:30*60, playing:24*60*60, finished:30*60,
+});
+export function retentionSeconds(status){
+ if(!Object.hasOwn(ROOM_RETENTION_SECONDS,status))throw new RangeError('Invalid room phase');
+ return ROOM_RETENTION_SECONDS[status];
+}
 const PHASES = Object.freeze(['lobby', 'playing', 'finished']);
 const STATES = Object.freeze(['online', 'grace', 'disconnected', 'left', 'unknown']);
 const isMs = value => Number.isFinite(value) && value >= 0;
