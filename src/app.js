@@ -146,7 +146,7 @@ function renderBattle(){
  if(!game)return;
  const me=practice?0:game.me,enemy=1-me,own=game.topCard;
  const active=revealing(),ended=game.status==='finished';
- const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0].join('|');
+ const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||''].join('|');
  if(renderKey===signature)return;
  renderKey=signature;
  $('round-number').textContent=String(game.round+(active?0:ended?0:1)).padStart(2,'0');
@@ -167,6 +167,18 @@ function renderBattle(){
  $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.stat)));
  $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE TIE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
  $('call-dock').classList.toggle('hidden',!session||session.mode!=='remote');
+ const host=Boolean(session&&session.me.index===0);
+ $('battle-settings-open').classList.toggle('hidden',!host||ended);
+ if(!host||ended)$('battle-settings-panel').classList.add('hidden');
+ const settings=lobbySnapshot?.room?.revealSettings||{mode:'auto',seconds:2};
+ if(document.activeElement!==$('battle-reveal-setting'))$('battle-reveal-setting').value=settings.mode+'-'+settings.seconds;
+ if(session?.mode==='remote'&&!callHealthChecked){
+  callHealthChecked=true;
+  getCallAvailability().then(ok=>{
+   if(!session||session.mode!=='remote')return;
+   if(!ok){$('call-status').textContent='Calling requires DeckVerse LiveKit setup';$('call-note').textContent='Voice/video is not connected yet; the card game remains playable.';}
+  }).catch(()=>{});
+ }
  if(active)showRoundResult(last,me);else if(ended)showFinalResult(me);else $('result').classList.add('hidden');
  queueRevealRefresh();
 }
