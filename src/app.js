@@ -114,30 +114,90 @@ function beginPolling(){
  sync();
 }
 function playerName(i){if(practice)return i===0?displayName():'RIVAL BOT';return session?.players?.find(x=>x.index===i)?.name||('PLAYER '+(i+1))}
+function revealing(){
+ const r=game?.reveal;
+ if(!game?.last||!r?.until||game?.endReason==='forfeit')return false;
+ const deadline=Date.parse(r.until);
+ if(!Number.isFinite(deadline)||Date.now()>=deadline)return false;
+ return r.mode!=='manual'||(r.acks?.length||0)<2;
+}
+function queueRevealRefresh(){
+ clearTimeout(revealTimer);revealTimer=null;
+ if(revealing()){
+  const ms=Math.max(15,Date.parse(game.reveal.until)-Date.now()+35);
+  revealTimer=setTimeout(()=>{renderKey='';renderBattle()},ms);
+ }
+}
 function renderBattle(){
- if(!game)return;const me=practice?0:game.me,enemy=1-me,own=game.topCard,chooser=game.chooser===me,ended=game.status==='finished';
- $('round-number').textContent=String(game.round+1).padStart(2,'0');
+ if(!game)return;
+ const me=practice?0:game.me,enemy=1-me,own=game.topCard;
+ const active=revealing(),ended=game.status==='finished';
+ const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0].join('|');
+ if(renderKey===signature)return;
+ renderKey=signature;
+ $('round-number').textContent=String(game.round+(active?0:ended?0:1)).padStart(2,'0');
  $('you-name').textContent=playerName(me).toUpperCase();$('enemy-name').textContent=playerName(enemy).toUpperCase();
  $('you-count').textContent=game.counts[me];$('enemy-count').textContent=game.counts[enemy];
- $('my-card').innerHTML=pokemonCard(own);$('their-card').innerHTML='<div class="card-back"><span>✦</span></div>';
- $('battle-status').textContent=ended?(game.winner===me?'YOU OWN THE DECK!':'YOUR RIVAL WON THE DECK'):chooser?'YOUR TURN TO CHOOSE':'WAITING ON YOUR RIVAL';
- $('turn-power').textContent=ended?'✦ MATCH COMPLETE':chooser?'✦ YOU HAVE THE POWER':'⌛ YOUR RIVAL HAS THE POWER';
- $('controls-title').textContent=ended?'THE SHOWDOWN IS OVER.':chooser?'THE NEXT MOVE IS YOURS.':'HOLD TIGHT. NEXT CARD IS COMING.';
- $('control-subtitle').textContent=ended?'Exit and rematch for another battle.':chooser?'Pick the stat that will defeat your rival.':'Your rival is choosing which stat to compare.';
- $('stat-buttons').innerHTML=STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+((!chooser||ended)?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(own?Number(own[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
+ const last=game.last,showLast=active&&last?.cards?.length===2;
+ const myShown=showLast?card(last.cards[me].id):own;
+ const theirShown=showLast?card(last.cards[enemy].id):null;
+ $('my-card').innerHTML=pokemonCard(myShown,showLast?last.stat:'');
+ $('their-card').innerHTML=theirShown?pokemonCard(theirShown,last.stat):'<div class="card-back"><span>✦</span></div>';
+ const chooser=game.chooser===me;
+ const canPlay=!active&&!ended&&chooser&&!actionBusy;
+ $('battle-status').textContent=active?'BOTH CARDS REVEALED':ended?(game.winner===me?'MATCH WON':'MATCH OVER'):chooser?'YOUR TURN TO CHOOSE':'WAITING ON YOUR RIVAL';
+ $('turn-power').textContent=active?'✦ REVIEW YOUR LAST BATTLE':ended?'✦ MATCH COMPLETE':chooser?'✦ YOU HAVE THE POWER':'⌛ YOUR RIVAL HAS THE POWER';
+ $('controls-title').textContent=active?'REVIEW THE TWO POKÉMON.':ended?'THE SHOWDOWN IS OVER.':chooser?'THE NEXT MOVE IS YOURS.':'HOLD TIGHT. NEXT CARD IS COMING.';
+ $('control-subtitle').textContent=active?'The next category unlocks after both have seen the result.':ended?'See the final result above.':chooser?'Choose the category you think will win.':'Your rival is choosing a category.';
+ $('stat-buttons').innerHTML=STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(own?Number(own[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
  $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.stat)));
  $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE TIE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
- $('call-dock').classList.toggle('hidden',!session||session.mode!=='remote');if(ended){showFinalResult(me)}
+ $('call-dock').classList.toggle('hidden',!session||session.mode!=='remote');
+ if(active)showRoundResult(last,me);else if(ended)showFinalResult(me);else $('result').classList.add('hidden');
+ queueRevealRefresh();
 }
-function showFinalResult(me){$('result').className='result-pop '+(game.winner===me?'win':'loss');$('result').innerHTML='<div class="result-icon">'+(game.winner===me?'🏆':'⚔')+'</div><h3>'+(game.winner===me?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!')+'</h3><p>'+game.round+' ROUNDS · '+game.total+' CARDS · ONE LEGEND</p><button class="btn btn-primary" id="play-again" style="margin-top:15px">'+(practice?'REMATCH THE BOT ↗':'BACK TO ROOMS ↗')+'</button>';$('result').classList.remove('hidden');$('play-again').onclick=()=>{if(practice)startPractice();else exitGame()}}
-function showRoundResult(last){if(game?.status==='finished')return;if(last.round===renderedRound)return;renderedRound=last.round;const me=practice?0:game.me,win=last.winner===me,tie=last.kind==='tie',name=last.stat.toUpperCase();$('result').className='result-pop '+(tie?'tie':win?'win':'loss');$('result').innerHTML='<div class="result-icon">'+(tie?'🤝':win?'✦':'⚔')+'</div><h3>'+(tie?'IT’S A TIE!':win?'YOU WON THE ROUND!':'RIVAL TAKES THE CARDS')+'</h3><p>'+name+' · '+last.values.map(x=>Number(x).toLocaleString(undefined,{maximumFractionDigits:2})).join(' VS ')+'</p><p>'+(tie?'Cards move to the jackpot · '+game.pot+' at stake':'Cards collected · next category power transferred')+'</p>';
- const opp=last.cards[1-me];if(opp)$('their-card').innerHTML=pokemonCard(card(opp.id),last.stat);
- const my=last.cards[me];if(my)$('my-card').innerHTML=pokemonCard(card(my.id),last.stat);
- setTimeout(()=>{if(game?.round===last.round&&game.status!=='finished'){$('result').classList.add('hidden');renderBattle()}},1650);
+function showFinalResult(me){
+ const forfeit=game.endReason==='forfeit',win=game.winner===me;
+ $('result').className='result-pop final '+(win?'win':'loss');
+ $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED BY FORFEIT'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':'50 CARDS · ONE LEGEND')+'</p><button class="btn btn-primary" id="play-again">'+(practice?'REMATCH THE BOT ↗':'BACK TO ROOMS ↗')+'</button>';
+ $('result').classList.remove('hidden');
+ $('play-again').onclick=()=>{if(practice)startPractice();else exitGame()};
 }
-async function play(key){if(game?.status!=='playing'||game.chooser!==(practice?0:game.me))return;document.querySelectorAll('[data-stat]').forEach(b=>b.disabled=true);if(practice){try{practice=takeTurn(practice,0,key);game=viewFor(practice,0);renderBattle();showRoundResult(game.last);scheduleBot()}catch(e){toast(e.message)}return;}await roomAction('select',{stat:key,expectedRound:game.round});}
-function scheduleBot(){clearTimeout(botTimer);if(!practice||practice.status!=='playing'||practice.chooser!==1)return;botTimer=setTimeout(()=>{if(!practice||practice.status!=='playing'||practice.chooser!==1)return;const opponent=card(practice.players[1].deck[0]);const fields=STAT_FIELDS.map(s=>({key:s.key,score:DECKS[2].reduce((n,id)=>{const c=card(id);return n+((s.direction==='min'?opponent[s.key]<c[s.key]:opponent[s.key]>c[s.key])?1:0)},0)})).sort((a,b)=>b.score-a.score);const key=fields[Math.min(secureIndex(4),fields.length-1)].key;try{practice=takeTurn(practice,1,key);game=viewFor(practice,0);renderBattle();showRoundResult(game.last);scheduleBot()}catch(e){toast(e.message)}},1900)}
-async function exitGame(){if(session){try{await api('leave',{code:session.code,token:session.token})}catch{}}await leaveCall();clearInterval(poll);poll=null;clearTimeout(botTimer);practice=null;game=null;session=null;try{sessionStorage.removeItem('deckverse_session')}catch{}$('result').classList.add('hidden');show('setup')}
+function showRoundResult(last,me){
+ if(!last?.cards?.length)return;
+ const enemy=1-me,tie=last.kind==='tie',win=last.winner===me;
+ const mine=card(last.cards[me].id),theirs=card(last.cards[enemy].id);
+ const showNumber=x=>Number(x).toLocaleString(undefined,{maximumFractionDigits:2});
+ const title=tie?'IT’S A TIE!':win?'YOU WON THIS ROUND!':'YOUR RIVAL WON THIS ROUND';
+ const details=tie?'Both cards move to the jackpot.':win?'You collect both cards'+(last.awarded?.length>2?' and the jackpot.':'.'):'Your rival collects both cards'+(last.awarded?.length>2?' and the jackpot.':'.');
+ const manual=game.reveal?.mode==='manual',acked=game.reveal?.acks?.includes(me),seconds=game.reveal?.seconds||2;
+ const note=manual?(acked?'✓ YOU’RE READY · WAITING FOR RIVAL':'Inspect both cards, then tap Continue'):'NEXT ROUND IN '+Math.max(0,Math.ceil((Date.parse(game.reveal.until)-Date.now())/1000))+'s';
+ $('result').className='result-pop compact '+(tie?'tie':win?'win':'loss');
+ $('result').innerHTML='<span class="reveal-symbol">'+(tie?'🤝':win?'✦':'⚔')+'</span><div class="reveal-summary"><h3>'+title+'</h3><p><strong>'+escapeHtml(mine.name)+'</strong> '+showNumber(last.values[me])+' <span class="reveal-vs">VS</span> '+showNumber(last.values[enemy])+' <strong>'+escapeHtml(theirs.name)+'</strong> · '+escapeHtml(last.stat.toUpperCase())+'</p><small>'+details+'</small></div><div class="reveal-action">'+(manual?'<button id="round-continue" class="btn btn-primary" '+(acked?'disabled':'')+'>'+(acked?'✓ READY':'CONTINUE →')+'</button>':'<span class="reveal-countdown">'+note+'</span>')+'</div>';
+ $('result').classList.remove('hidden');
+ if(manual&&!acked){$('round-continue').onclick=async()=>{const b=$('round-continue');b.disabled=true;b.textContent='CONFIRMING…';const ok=await roomAction('ack',{expectedRound:game.round});if(!ok){b.disabled=false;b.textContent='CONTINUE →'}}}
+}
+async function play(key){
+ if(game?.status!=='playing'||game.chooser!==(practice?0:game.me)||revealing()||actionBusy)return;
+ document.querySelectorAll('[data-stat]').forEach(b=>b.disabled=true);
+ if(practice){
+  try{practice=takeTurn(practice,0,key);game={...viewFor(practice,0),me:0,practice:true,reveal:{mode:'auto',seconds:2,acks:[],until:new Date(Date.now()+2000).toISOString()}};renderKey='';renderBattle();scheduleBot()}catch(e){toast(e.message)}
+  return;
+ }
+ await roomAction('select',{stat:key,expectedRound:game.round});
+}
+function scheduleBot(){
+ clearTimeout(botTimer);
+ if(!practice||practice.status!=='playing'||practice.chooser!==1)return;
+ botTimer=setTimeout(()=>{
+  if(!practice||practice.status!=='playing'||practice.chooser!==1||revealing()){scheduleBot();return}
+  const opponent=card(practice.players[1].deck[0]);
+  const fields=STAT_FIELDS.map(s=>({key:s.key,score:DECKS[2].reduce((n,id)=>{const c=card(id);return n+((s.direction==='min'?opponent[s.key]<c[s.key]:opponent[s.key]>c[s.key])?1:0)},0)})).sort((a,b)=>b.score-a.score);
+  const key=fields[Math.min(secureIndex(4),fields.length-1)].key;
+  try{practice=takeTurn(practice,1,key);game={...viewFor(practice,0),me:0,practice:true,reveal:{mode:'auto',seconds:2,acks:[],until:new Date(Date.now()+2000).toISOString()}};renderKey='';renderBattle();scheduleBot()}catch(e){toast(e.message)}
+ },revealing()?2300:850);
+}
+async function exitGame(){if(session){try{await api('leave',{code:session.code,token:session.token})}catch{}}await leaveCall();stopPolling();clearTimeout(botTimer);resetReveal();practice=null;game=null;session=null;lobbySnapshot=null;try{sessionStorage.removeItem('deckverse_session')}catch{}$('result').classList.add('hidden');show('setup')}
 async function joinCall(){if(!session||session.mode!=='remote'){toast('CALLS ONLY IN REMOTE ROOMS');return}try{const r=await fetch('/api/livekit-token',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:session.code,token:session.token})});const j=await r.json();if(!r.ok)throw Error(j.error||'LiveKit unavailable');const lib=await import('https://esm.sh/livekit-client@2.15.3');call=new lib.Room({adaptiveStream:true,dynacast:true});await call.connect(j.url,j.token);call.on(lib.RoomEvent.TrackSubscribed,(track,pub,participant)=>{if(track.kind==='video'){const video=track.attach();video.autoplay=true;video.playsInline=true;$('remote-video').replaceChildren(video)}else if(track.kind==='audio'){const audio=track.attach();audio.autoplay=true;audio.style.display='none';$('remote-video').append(audio)}});await call.localParticipant.setMicrophoneEnabled(true);$('call-join').classList.add('hidden');for(const id of ['call-mic','call-camera','call-leave'])$(id).classList.remove('hidden');toast('VOICE CONNECTED · CAMERA OPTIONAL')}catch(e){toast(e.message||'COULD NOT JOIN CALL')}}
 async function toggleMic(){if(call){await call.localParticipant.setMicrophoneEnabled(!call.localParticipant.isMicrophoneEnabled);$('call-mic').textContent=call.localParticipant.isMicrophoneEnabled?'🎤':'🔇'}}
 async function toggleCamera(){if(call){try{await call.localParticipant.setCameraEnabled(!call.localParticipant.isCameraEnabled);$('call-camera').textContent=call.localParticipant.isCameraEnabled?'📷':'📷̸'}catch{toast('CAMERA PERMISSION DENIED')}}}
