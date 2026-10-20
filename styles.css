@@ -145,3 +145,8 @@ html,body,#app{max-width:100%;overflow-x:clip}
 /* Browser-triggered LiveKit sound unlock on Safari and other autoplay-restricted clients. */
 #call-audio{background:#caff58!important;color:#151525!important;font-size:10px!important;letter-spacing:.02em}
 #call-audio:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+/* Codex V1.2 accessibility hardening retained in V2 */
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+.stat-button{min-height:44px}
+#battle button{min-height:44px}
