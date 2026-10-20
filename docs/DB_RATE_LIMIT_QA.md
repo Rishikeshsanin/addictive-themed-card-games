@@ -51,7 +51,25 @@ Environment variables `PG_ADMIN_URL`, `PG_APP_URL`, and `PG_APP_PASSWORD` are ma
 
 ## CI execution and results
 
-**Status:** Awaiting CI proof when this document was authored. A successful run link, actual numeric output and any corrected defects must be added before marking the agent deliverable verified. Mocked results must not be presented as real PostgreSQL evidence.
+**Status: PASS — disposable PostgreSQL integration checks.** [GitHub Actions DB run #39452594777](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39452594777) completed **11/11 passing**, using PostgreSQL 16-alpine and the unmodified reviewed migration 005 in a local disposable service container. [Standard DeckVerse CI #39452594782](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39452594782) also passed. No Supabase production SQL was executed.
+
+| Actual PostgreSQL CI evidence | Verified measurement |
+| --- | --- |
+| Real concurrent attempts | 200 attempts, 8 pools / max 24 connections, **31 accepted, 169 rejected**, persisted bucket hits=31 |
+| 200-way contention | wall 221 ms; per-request p50 180.22 ms, p95 211.75 ms (includes pool queuing, not production latency) |
+| Action quotas | create 8/9, per-code join 8/9, wrong-code 12/13, failed auth 15/16: final attempt denied |
+| Synthetic LiveKit issuance | 15 permitted per token per minute, 16th denied; another synthetic token permitted |
+| Four-player simulated NAT | 361 read polls plus four joins/heartbeat, **0 denied**; read-limiter p50 1.08 ms, p95 1.36 ms |
+| RLS / minimum role grants | forced RLS, DeckVerse app role allowed DML; anon/authenticated/service_role denied in disposable fixture |
+| Window / 429 | DB-clock 1-second rollover; HTTP 429 with `Retry-After: 1`; safe error JSON |
+| Bounded cleanup | 700/700 expired records deleted in **256 / 256 / 188** batches |
+| Small-table EXPLAIN | 700-row fixture: planner did **not** choose expiry index (query execution 0.392 ms), a reasonable small-table choice |
+| Larger-table EXPLAIN | 12,000 counters / 1,200 expired: planner **did** use `deckverse_rate_limit_expiry_idx`; execution 0.199 ms |
+| Fail-closed and persistence | closed backend connection rejected query; new connection retained exhausted quota |
+
+**Verification history:** First DB CI attempt #39451902210 passed the 200-request concurrency test but failed one *test setup*, because twelve guesses reused the same code and correctly hit the separate eight-per-code quota first. The test was corrected to rotate twelve different guessed codes. Rerun #39452090789 passed 10/10. The final #39452594777 added scale-sensitive expiry-index EXPLAIN coverage and passed 11/11. No underlying limiter or schema defect was found by this test suite.
+
+**Scope of proof:** This validates actual PostgreSQL transaction behavior and role grants in the ephemeral fixture. It does **not** establish production p95 latency, real-project grant inheritance, cross-instance Vercel proxy trust, full HTTP/game-server integration, physical device behavior, or indefinite storage bounds. Repeating rejected requests still invokes PostgreSQL, so upstream abuse prevention remains important.
 
 ## Coordinator-only release requirements
 
