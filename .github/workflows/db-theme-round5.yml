@@ -1,6 +1,8 @@
 name: DeckVerse Round 5 theme HTTP / PostgreSQL 17.6 QA
 
 on:
+  push:
+    branches: [agent/a-round5-theme-db-e2e]
   pull_request:
     paths:
       - 'tests/db-theme-round5-*.mjs'
@@ -28,7 +30,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: round5_fake_admin_only
         ports:
-          - 127.0.0.1:5432:5432
+          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U postgres -d deckverse_round5_ci"
           --health-interval 3s
