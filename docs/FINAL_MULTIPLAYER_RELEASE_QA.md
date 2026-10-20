@@ -61,6 +61,39 @@ The final result is appended to the existing uploaded `/tmp/deckverse-db-multipl
 - No real Supabase SQL executed; no merge, deploy, or other application modified.
 - **Verdict remains NO-GO for production V2 until separate deployment gates are approved.**
 
-## CI evidence
+## Final verified CI evidence — PASS
 
-**Pending validation of this newly added final stress suite.** Record the passing/failing latest-run URL, measured latency and exact remaining blockers here and in the PR after the run completes. Do not equate a submitted test with a pass.
+**Executed test commit:** `14296695aab9fb8174294da49518e40a6bc7c809` (code under test). Both workflows succeeded:
+- [Real disposable PostgreSQL 16 + local HTTP + Chromium: run 39459429707](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39459429707) — SUCCESS.
+- [Standard DeckVerse CI: run 39459429708](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39459429708) — SUCCESS.
+- [Download screenshot and evidence JSON artifact](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39459429707/artifacts/12282341123). The JSON `finalRelease` section records 1,506 HTTP calls and the completed match rounds.
+
+**New repeated-match results, real local HTTP and SQL transactions:**
+
+| Mode | Epoch 1 | Epoch 2 | Verified conclusion |
+|---|---:|---:|---|
+| 2 players; 50 unique cards | 271 rounds | 33 rounds | two complete wins, rematch reset, original seats and room kept |
+| 3 players; 60 unique cards | 35 rounds | 245 rounds | two complete wins, rematch reset, original seats and room kept |
+| 4 players; 80 unique cards | 92 rounds | 484 rounds | two complete wins, rematch reset, original seats and room kept |
+
+Per-state assertions enforced exact conserved card IDs, authoritative single-round winners, own-top-card privacy and unanimous match-number rematches. Recorded independent stress gates:
+- **4-player capacity:** seven real HTTP join requests for three vacancies — exactly three committed.
+- **Concurrent turn:** twelve real HTTP requests for identical round — exactly one committed; eleven returned 409.
+- **Host recovery:** a stale seven-minute host triggered transfer/pause; authentic heartbeat restored play with the same room and unchanged cards.
+- **Legacy V1 room:** the fixture's original 2P room/seat survived 004 double application followed by 005/006, with expected default host/count and forced RLS on all three app-owned tables.
+- **Browser:** prior 2P/3P/4P SQL-backed synthetic-Chromium tests passed in the same workflow before final stress ran.
+
+**Observed local-CI HTTP API timings in ms (not real mobile/production latency):**
+
+| Action | Requests | p50 | p95 | Maximum |
+|---|---:|---:|---:|---:|
+| Create | 6 | 5.35 | 6.86 | 8.44 |
+| Join | 18 | 5.52 | 30.18 | 60.56 |
+| Ready | 11 | 5.43 | 6.10 | 6.26 |
+| Start | 5 | 6.49 | 7.46 | 7.63 |
+| Select | 1,174 | 5.45 | 6.66 | 41.78 |
+| Get | 180 | 4.45 | 6.38 | 8.21 |
+| Heartbeat | 95 | 9.89 | 14.11 | 20.74 |
+| Rematch | 15 | 5.96 | 10.13 | 14.38 |
+
+**Release blockers unchanged:** exact PG17 real-schema parity, authorized Hub migration with scoped resource registration, independent backup/restore, actual staging/postmigration checks, real device/network validation, fairness policy and intellectual-property clearance. A green synthetic CI is not authorization to migrate/deploy.
