@@ -110,6 +110,44 @@ First-50 average strength is not perfectly neutral against the 80-card inventory
 
 [Small pilot run 39479853185](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479853185): four seed blocks per theme/player count, every chooser seat rotated, best/random/Rank, cap 1,200. Every one of 21 rank-only two-/three-/four-player scenarios ran; some 4-player random strategy runs reached the round cap. The largest concern is **DC random 4-player: 12 of 16 unfinished by 1,200**; Cricket random 4-player also **12/16 capped**, Ben 10 and Naruto random 4-player **8/16 capped**. Avengers **best** 4-player had **3/16 capped**, demonstrating that long matches are not only a random-strategy issue. No scored cap should be called a permanent game loop without matching repeated-state evidence.
 
-This pilot is **not a statistically adequate first-chooser fairness claim**: only four independent shuffle blocks per scenario, and cap censoring removes whole blocks from the win-rate CI. A separate expanded 12-block / 3,000-round-cap pass is being executed to improve the exploratory estimates. The existing Pokémon study had 600 seed blocks, so even the expanded audit remains a **screening gate**, not sign-off.
+The four-block/1,200-round pilot is **not** a statistically adequate first-chooser fairness claim; the extended analysis below replaces it for the release screening summary.
+
+### Extended seeded study — exact CI evidence
+
+[GitHub Actions run 39480301475](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39480301475) **PASS**, 114/114 Node unit tests plus remaining standard browser suite. Configuration: **12 deterministic seed blocks × each 2/3/4 chooser seat × seven themes × three strategies = 2,268 simulations**, each capped at **3,000 rounds**. Results: best **756/756 finished**, random **713/756 finished (43 capped)**, Rank-only **752/756 finished (4 capped)**; **zero detected repeated full-deck-order cycles** across the 2,268 runs. A cap is censoring, not a proven infinite loop. No engine or production rules were changed.
+
+**Best top-card-informed strategy, first-chooser win rates (simulation only):**
+
+| Pack | 2P, neutral 50% | 3P, neutral 33.33% | 4P, neutral 25% | 4P p90 finished rounds | 4P longest observed |
+|---|---:|---:|---:|---:|---:|
+| Avengers | **70.83%** | 47.22% | 27.08% | 572 | **1,571** |
+| Ben 10 | 58.33% | 36.11% | 22.92% | 614 | 934 |
+| Shin-chan | 50.00% | **52.78%** | 29.17% | 344 | 583 |
+| DC | 58.33% | 41.67% | **35.42%** | 395 | 956 |
+| Naruto | 62.50% | 41.67% | 31.25% | 576 | 731 |
+| Cricket | 45.83% | 41.67% | 29.17% | 586 | 686 |
+| Elemental Realms | **70.83%** | 30.56% | 31.25% | 470 | 654 |
+
+**Uncertainty warning:** only **12 independent shuffle-seed clusters** per pack/player count, so these estimates are noisy. For example, Avengers 2P 70.83% has an approximate clustered **95% CI of 56.27%–85.40%**, Elemental Realms likewise 56.27%–85.40%, and Shin-chan 3P 52.78% has **43.07%–62.49%**. These normal-approximation intervals are exploratory, and numerous theme/size comparisons create multiple-testing risk. The previous Pokémon study used **600 seeds**; no new theme should be declared “fair” simply because its 12-block interval overlaps the neutral share.
+
+**Random-category long-match concern (3,000-round cap, 12 blocks):**
+
+| Pack | Random 4P finished / 48 | Random 4P capped | Median / p90 completed rounds | Longest completed random 4P |
+|---|---:|---:|---:|---:|
+| Avengers | 48 | 0 | 676 / 1,631 | 1,675 |
+| Ben 10 | 40 | **8** | 776 / 2,041 | 2,118 |
+| Shin-chan | 40 | **8** | 705 / 1,786 | 2,057 |
+| DC | 44 | 4 | **1,334 / 2,572** | 2,785 |
+| Naruto | 40 | **8** | 939 / 1,779 | 1,907 |
+| Cricket | 44 | 4 | 811 / 1,656 | 2,182 |
+| Elemental Realms | 40 | **8** | 844 / 1,303 | **2,895** |
+
+Elemental Realms random 3P additionally **capped 3 of 36**, and Cricket **Rank-only 4P capped 4 of 48**; all other Rank-only runs finished. Longest completed random **Shin-chan 2P: 2,961 rounds**. The best-strategy 4P Avengers long tail at 1,571 rounds, and DC random 4P p90 of 2,572, warrant more testing before shipping without a product-approved draw/stalemate experience. **Do not add an arbitrary round-limit gameplay rule in this audit.**
+
+**Observed recorded jackpots and ties under best strategy:** max awarded pot-inclusive cards per round: Avengers 4P 8; Ben 10 4P 12; Shin-chan 4P 16; DC 4P 12; Naruto 4P 12; Cricket 4P 12; Elemental Realms 4P **20**, with longest standing pots up to **16**. Across best games there were **5,050 tied rounds over 150,891 played rounds (3.35%)**, and **all game states passed the engine's strict card-conservation validator** on every turn. In random games, 20,399 tied rounds were observed over 730,323 rounds (2.79%, includes unfinished games); Rank-only had zero ties, as intended by its unique Rank values. Exact per-theme category calls, all seat victories, the p99 distributions and per-pack max awards are printed by the seeded audit test.
+
+**Seat-bias interpretation:** complete-block chooser estimates rotate the same shuffled deck through all starting seats. Raw winning-seat counts are **correlated within each block**, not 24/36/48 independent trials. In Rank-only and random controls, moving the starting chooser does not change category-selection policy; therefore the 25/33.3/50% chooser rates are structural controls, not demonstrated human impartiality. Strong differences between raw seat counts (e.g., Cricket Rank-only 4P seat 1's zero wins among completed seat rotations) need more *independent deck shuffles* before being called a seat-specific rule flaw.
+
+**Compared to historical Pokémon:** the prior 600-block Pokémon best-strategy study estimated first-chooser rates **59.17% / 42.67% / 32.04%** for 2/3/4 players, with no capped best-strategy games under 3,000 rounds. The themes vary both above and below that baseline; Avengers and Fantasy 2P 70.83% is concerning enough to prioritize additional paired trials, not precise enough to require unapproved balance edits.
 
 **Release verdict: NOT APPROVED** until a human editorial pass reviews all 560 CSV/JSON rows, severity flags and named classifications; simulations demonstrate appropriate fairness using more independent seeds; product owners decide what constitutes unacceptable first chooser advantage, excessive round length or a fair tie mechanic; theme-server integration is tested with concealed decks against an approved isolated database; and each relevant character/trademark/person-likeness right is cleared. No production resource has been accessed or changed.
