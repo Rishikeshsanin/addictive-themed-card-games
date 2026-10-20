@@ -27,3 +27,14 @@ test('manual reveal needs TWO acknowledgements or a 90s fallback',()=>{
  assert.equal(revealState({...base,acks:[0,1]},10000).active,false);
  assert.equal(revealState({...base,acks:[]},90000).active,false);
 });
+
+for(const n of [3,4]){
+ test(n+'-player manual reveal requires unanimous confirmation',()=>{
+  const r={mode:'manual',seconds:2,required:n,until:new Date(90000).toISOString()};
+  const all=Array.from({length:n},(_,i)=>i);
+  assert.equal(revealState({...r,acks:all.slice(0,-1)},1000).active,true);
+  assert.equal(revealState({...r,acks:all},1000).active,false);
+  assert.equal(revealState({...r,acks:[...all.slice(0,-1),999]},1000).active,true);
+  assert.equal(revealState({...r,acks:[]},90000).active,false);
+ });
+}

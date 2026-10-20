@@ -1,8 +1,10 @@
 import postgres from 'postgres';
 import {createHash,randomBytes,randomInt} from 'node:crypto';
 import {newGame,takeTurn,viewFor} from '../src/engine.js';
+import {startMultiGame,multiTurn,multiViewFor} from '../src/multi-engine.js';
 import {DECKS} from '../src/catalog.js';
 import {revealState,revealDeadline,mayAdvance,validateRevealSettings} from '../src/reveal.js';
+import {decideRematch} from '../src/rematch.js';
 const dbUrl=process.env.DECKVERSE_DATABASE_URL;
 const sql=dbUrl?postgres(dbUrl,{ssl:'require',max:3,prepare:false,idle_timeout:15,connect_timeout:9}):null;
 const hash=val=>createHash('sha256').update(val).digest('hex');
@@ -10,7 +12,9 @@ const secret=()=>randomBytes(32).toString('hex');
 const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const code=()=>Array.from({length:6},()=>alphabet[randomInt(alphabet.length)]).join('');
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
-const allowedAction=new Set(['create','join','get','ready','start','select','settings','ack','leave']);
+const playerCountOf=r=>r.player_count||2;
+const newMatch=n=>n===2?newGame({ids:DECKS[2]}):startMultiGame({playerCount:n});
+const allowedAction=new Set(['create','join','get','ready','start','rematch','select','settings','ack','leave']);
 let verified=false;
 async function connected(){if(!sql)throw fail('Game rooms are awaiting an isolated database connection. Solo practice is available.',503);if(!verified){const [r]=await sql`select current_user as role`;if(r.role!=='deckverse_app')throw fail('Game backend configuration failed its dedicated-role security check.',503);verified=true;}return sql}
 export const safeName=n=>{if(typeof n!=='string'||n.trim().length<2||n.trim().length>24||/[<>\p{Cc}\p{Cf}]/u.test(n))throw fail('Name must be 2–24 visible characters without HTML symbols.');return n.trim()};
@@ -25,29 +29,32 @@ async function snapshot(db,code,token){
  const found=rows.find(p=>p.token_hash===safeToken(token));
  if(!found)throw fail('Session expired. Rejoin with the room code.',401);
  const me={index:found.seat,name:found.name,ready:found.ready};
+ const count=playerCountOf(room);
  const activePolicy=room.state?.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
- const reveal=room.state?.last?revealState({...activePolicy,until:room.reveal_until,acks:room.reveal_acks}):null;
- const game=room.state?{...viewFor(room.state,me.index),reveal,endReason:room.state.endReason||null}:null;
- return {room:{code:room.code,mode:room.mode,status:room.status,revealSettings:{mode:room.reveal_mode,seconds:room.reveal_seconds}},players:rows.map(p=>({index:p.seat,name:p.name,ready:p.ready})),me,game};
+ const reveal=room.state?.last?revealState({...activePolicy,required:count,until:room.reveal_until,acks:room.reveal_acks}):null;
+ const view=room.state?(count===2?viewFor(room.state,me.index):multiViewFor(room.state,me.index)):null;
+ const game=view?{...view,reveal,endReason:room.state.endReason||null,matchNumber:room.state.matchNumber||1,rematchVotes:room.status==='finished'?rows.filter(p=>p.ready).map(p=>p.seat):[]}:null;
+ return {room:{code:room.code,mode:room.mode,status:room.status,playerCount:count,revealSettings:{mode:room.reveal_mode,seconds:room.reveal_seconds}},players:rows.map(p=>({index:p.seat,name:p.name,ready:p.ready})),me,game};
 }
 async function create(db,b){
- const name=safeName(b.name),mode=safeMode(b.mode),raw=secret(),digest=hash(raw);
+ const name=safeName(b.name),mode=safeMode(b.mode),count=b.playerCount??2,raw=secret(),digest=hash(raw);
+ if(![2,3,4].includes(count))throw fail('Room size must be 2, 3 or 4.');
  const [active]=await db`select count(*)::integer as count from deckverse.rooms where expires_at>now() and status in ('lobby','playing')`;if(active.count>300)throw fail('Active-room capacity reached. Try again later.',429);
  for(let tries=0;tries<6;tries++){
  const c=code();try{
- await db.begin(async tx=>{const [r]=await tx`insert into deckverse.rooms(code,mode,status) values(${c},${mode},'lobby') returning id`;await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready) values(${r.id},0,${name},${digest},true)`;});
+ await db.begin(async tx=>{const [r]=await tx`insert into deckverse.rooms(code,mode,status,player_count) values(${c},${mode},'lobby',${count}) returning id`;await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready) values(${r.id},0,${name},${digest},true)`;});
  return {...await snapshot(db,c,raw),token:raw};
  }catch(e){if(e.code!=='23505'||tries===5)throw e}
  }throw fail('Could not create room. Please try again.',503);
 }
 async function join(db,b){const c=safeCode(b.code),name=safeName(b.name),raw=secret(),digest=hash(raw);
- await db.begin(async tx=>{const r=await readRoom(tx,c,true);if(r.status!=='lobby')throw fail('This match has already started.');const existing=await tx`select seat,name from deckverse.players where room_id=${r.id} and active=true`;if(existing.length>=2)throw fail('This room is full.');if(existing.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw fail('Please choose a different nickname.');const seat=existing[0]?.seat===0?1:0;await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,active) values(${r.id},${seat},${name},${digest},false,true) on conflict (room_id,seat) do update set name=excluded.name,token_hash=excluded.token_hash,ready=false,active=true,last_seen_at=now()`;});
+ await db.begin(async tx=>{const r=await readRoom(tx,c,true);if(r.status!=='lobby')throw fail('This match has already started.');const existing=await tx`select seat,name from deckverse.players where room_id=${r.id} and active=true`;if(existing.length>=playerCountOf(r))throw fail('This room is full.');if(existing.some(p=>p.name.toLowerCase()===name.toLowerCase()))throw fail('Please choose a different nickname.');const seat=Array.from({length:playerCountOf(r)},(_,i)=>i).find(i=>!existing.some(p=>p.seat===i));await tx`insert into deckverse.players(room_id,seat,name,token_hash,ready,active) values(${r.id},${seat},${name},${digest},false,true) on conflict (room_id,seat) do update set name=excluded.name,token_hash=excluded.token_hash,ready=false,active=true,last_seen_at=now()`;});
  return {...await snapshot(db,c,raw),token:raw};
 }
 async function action(db,b){
  const c=safeCode(b.code);safeToken(b.token);
  if(b.action==='get')return snapshot(db,c,b.token);
- if(b.action==='leave'){await db.begin(async tx=>{const room=await readRoom(tx,c,true);const me=await auth(tx,room,b.token);await tx`update deckverse.players set active=false,ready=false where room_id=${room.id} and seat=${me.index}`;if(room.status==='playing'&&room.state){const state=room.state;state.status='finished';state.winner=1-me.index;state.endReason='forfeit';await tx`update deckverse.rooms set state=${tx.json(state)},status='finished',updated_at=now() where id=${room.id}`;}else if(me.index===0){await tx`update deckverse.rooms set expires_at=now(),status='finished' where id=${room.id}`;}});return {ok:true};}
+ if(b.action==='leave'){await db.begin(async tx=>{const room=await readRoom(tx,c,true);const me=await auth(tx,room,b.token);await tx`update deckverse.players set active=false,ready=false where room_id=${room.id} and seat=${me.index}`;if(room.status==='playing'&&room.state){const state=room.state;state.status=playerCountOf(room)===2?'finished':'aborted';state.winner=playerCountOf(room)===2?1-me.index:null;state.endReason='forfeit';await tx`update deckverse.rooms set state=${tx.json(state)},status='finished',updated_at=now() where id=${room.id}`;}else if(me.index===0){await tx`update deckverse.rooms set expires_at=now(),status='finished' where id=${room.id}`;}});return {ok:true};}
  await db.begin(async tx=>{
    const room=await readRoom(tx,c,true);const me=await auth(tx,room,b.token);
    if(b.action==='ready'){
@@ -62,7 +69,7 @@ async function action(db,b){
      const activePolicy=room.state?.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
      if(!room.state?.last||activePolicy.mode!=='manual')throw fail('No manual reveal is active.',409);
      if(b.expectedRound!==room.state.round)throw fail('The round already changed.',409);
-     const display=revealState({...activePolicy,until:room.reveal_until,acks:room.reveal_acks});
+     const display=revealState({...activePolicy,required:playerCountOf(room),until:room.reveal_until,acks:room.reveal_acks});
      if(display.active&&!display.acks.includes(me.index)){
        await tx`update deckverse.rooms set reveal_acks=${tx.json([...display.acks,me.index])},updated_at=now() where id=${room.id}`;
      }
@@ -70,16 +77,31 @@ async function action(db,b){
      if(me.index!==0)throw fail('Only the host can start.');
      if(room.status!=='lobby')throw fail('Match already started.');
      const ps=await tx`select seat,ready from deckverse.players where room_id=${room.id} and active=true order by seat`;
-     if(ps.length!==2||!ps.every(p=>p.ready))throw fail('Both players must join and be ready.');
-     const state=newGame({ids:DECKS[2]});
+     if(ps.length!==playerCountOf(room)||!ps.every(p=>p.ready))throw fail('All players must join and be ready.');
+     const state=newMatch(playerCountOf(room));
+     state.matchNumber=1;
+     await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
      await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',updated_at=now() where id=${room.id}`;
+   }else if(b.action==='rematch'){
+     const ps=await tx`select seat,ready from deckverse.players where room_id=${room.id} and active=true order by seat`;
+     const decision=decideRematch({status:room.status,state:room.state,players:ps,seat:me.index});
+     if(decision.error)throw fail(decision.error,409);
+     if(!ps.find(p=>p.seat===me.index)?.ready){
+       await tx`update deckverse.players set ready=true where room_id=${room.id} and seat=${me.index} and active=true`;
+     }
+     if(decision.restart){
+       const state=newMatch(playerCountOf(room));
+       state.matchNumber=(room.state.matchNumber||1)+1;
+       await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
+       await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',reveal_until=null,reveal_acks='[]'::jsonb,updated_at=now() where id=${room.id}`;
+     }
    }else if(b.action==='select'){
      if(room.status!=='playing'||!room.state)throw fail('Match is not active.');
      if(!Number.isInteger(b.expectedRound)||b.expectedRound!==room.state.round)throw fail('Round has already advanced. Please wait for synchronization.',409);
      const activePolicy=room.state.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
-     const display=revealState({...activePolicy,until:room.reveal_until,acks:room.reveal_acks});
+     const display=revealState({...activePolicy,required:playerCountOf(room),until:room.reveal_until,acks:room.reveal_acks});
      if(!mayAdvance(display))throw fail('The previous card reveal is still in progress.',409);
-     const state=takeTurn(room.state,me.index,b.stat);
+     const state=playerCountOf(room)===2?takeTurn(room.state,me.index,b.stat):multiTurn(room.state,me.index,b.stat);
      state.revealPolicy={mode:room.reveal_mode,seconds:room.reveal_seconds};
      const until=revealDeadline(state.revealPolicy);
      await tx`update deckverse.rooms set state=${tx.json(state)},status=${state.status},reveal_until=${until},reveal_acks='[]'::jsonb,updated_at=now() where id=${room.id}`;

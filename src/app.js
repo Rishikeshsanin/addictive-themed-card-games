@@ -2,8 +2,10 @@ import {STAT_FIELDS,DECKS,deckFor,card,art} from './catalog.js';
 import {newGame,takeTurn,viewFor,secureIndex} from './engine.js';
 import {initCallControls,disconnectCall,getCallAvailability} from './livekit-call.js';
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let screen='landing',mode='same',session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
+let screen='landing',mode='same',roomSize=2,session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
 let pollBusy=false,actionBusy=false,readyBusy=false,pollTimer=null,revealTimer=null,renderKey='',lobbySnapshot=null,callHealthChecked=false;
+let pollEpoch=0,pollDelay=0,networkState='connected';
+function networkStatus(state){if(networkState===state)return;networkState=state;const box=$('network-status');if(!box)return;box.classList.toggle('hidden',state==='connected');box.textContent=state==='offline'?'OFFLINE · Your room is preserved. Reconnect to continue.':'RECONNECTING · Your cards and room remain safe.';renderKey='';if(screen==='battle'&&game)renderBattle();}
 const symbols={rank:'♛',height:'↕',weight:'◆',attack:'⚔',defense:'⬡',speed:'⚡',energy:'✧',hp:'♥'};
 const elements=['landing','setup','lobby','battle'];
 function show(id){screen=id;for(const el of elements)$(el).classList.toggle('hidden',el!==id);if(id!=='landing')window.scrollTo(0,0);if(id==='landing')location.hash='';if(id==='setup')checkRoomHealth();}
@@ -28,15 +30,22 @@ async function checkRoomHealth(){
  message.textContent='● ONLINE ROOMS ARE BEING CONNECTED — SOLO PRACTICE IS PLAYABLE';
  message.classList.add('offline');
 }
-function stopPolling(){clearInterval(poll);poll=null;clearTimeout(pollTimer);pollTimer=null;pollBusy=false;}
+function stopPolling(){pollEpoch++;clearInterval(poll);poll=null;clearTimeout(pollTimer);pollTimer=null;pollBusy=false;pollDelay=0;}
 function resetReveal(){clearTimeout(revealTimer);revealTimer=null;renderKey='';$('result').classList.add('hidden');}
 function setupScreen(){stopPolling();clearTimeout(botTimer);resetReveal();disconnectCall();callHealthChecked=false;practice=null;session=null;lobbySnapshot=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
 function init(){
+ window.addEventListener('online',()=>{if(session){networkStatus('reconnecting');beginPolling()}});
+ window.addEventListener('offline',()=>{if(session)networkStatus('offline')});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&session)beginPolling()});
  $('player-name').value=localStorage.getItem('deckverse_name')||'';
  for(const b of ['top-play','hero-play','pokemon-tile'])$(b).addEventListener('click',setupScreen);
  $('hero-how').addEventListener('click',()=>document.querySelector('#how').scrollIntoView({behavior:'smooth'}));
  $('setup-back').addEventListener('click',()=>show('landing'));
  document.querySelectorAll('.mode-card').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('.mode-card').forEach(n=>n.classList.toggle('selected',n===b))}));
+ document.querySelectorAll('[data-player-count]').forEach(button=>button.addEventListener('click',()=>{
+  roomSize=Number(button.dataset.playerCount);
+  document.querySelectorAll('[data-player-count]').forEach(option=>{const selected=option===button;option.classList.toggle('selected',selected);option.setAttribute('aria-pressed',String(selected));});
+ }));
  $('create-room').onclick=()=>enterRoom('create');$('join-room').onclick=()=>enterRoom('join');$('practice-btn').onclick=startPractice;
  $('copy-code').onclick=async()=>{const code=session?.code;if(!code)return;const url=location.origin+'/?room='+code;try{await navigator.clipboard.writeText(url);toast('INVITE LINK COPIED ✦')}catch{toast('ROOM CODE: '+code)}};
  $('toggle-ready').onclick=()=>toggleReady();
@@ -66,7 +75,7 @@ function init(){
 function startPractice(){saveName();stopPolling();resetReveal();disconnectCall();callHealthChecked=false;session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
 const API='/api/game';
 async function api(action,body={}){let response;try{response=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})})}catch{throw Error('Cannot connect to the game server. Check your internet connection.')};const data=await response.json().catch(()=>({error:'Unexpected server response'}));if(!response.ok||data.error)throw Error(data.error||'Room request failed');return data}
-async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
+async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code,playerCount:roomSize});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
 async function roomAction(action,params={}){
  if(!session)return false;
  actionBusy=true;
@@ -100,12 +109,12 @@ function updateRoom(data){
 function renderLobby(data){
  if(!data?.room||!session)return;
  $('room-code').textContent=data.room.code;
- const people=data.players||[];
- $('lobby-players').innerHTML=[0,1].map(i=>{const p=people.find(x=>x.index===i);return '<div class="player-slot"><span>'+(p?(i===0?'⚡':'🔥'):'◇')+'</span><strong>'+escapeHtml(p?.name||'WAITING FOR RIVAL')+'</strong><small>'+(p?(p.ready?'● READY':'○ NOT READY'):'INVITE SOMEONE TO JOIN')+'</small></div>'}).join('');
- $('lobby-message').textContent=people.length<2?'Share the invite link or code with your friend.':people.every(x=>x.ready)?'Both players ready. Let the battle begin!':'Waiting for both players to get ready…';
+ const people=data.players||[],count=data.room.playerCount||2;
+ $('lobby-players').innerHTML=Array.from({length:count},(_,i)=>i).map(i=>{const p=people.find(x=>x.index===i);return '<div class="player-slot"><span>'+(p?(i===0?'⚡':'🔥'):'◇')+'</span><strong>'+escapeHtml(p?.name||'WAITING FOR RIVAL')+'</strong><small>'+(p?(p.ready?'● READY':'○ NOT READY'):'INVITE SOMEONE TO JOIN')+'</small></div>'}).join('');
+ $('lobby-message').textContent=people.length<count?'Share the invite link: '+people.length+'/'+count+' players joined.':people.every(x=>x.ready)?'Everyone is ready. Let the battle begin!':'Waiting for all players to get ready…';
  $('toggle-ready').textContent=session.me.ready?'✓ READY — TAP TO UNREADY':"I'M READY";
  $('toggle-ready').disabled=readyBusy;
- $('start-match').disabled=!(session.me.index===0&&people.length===2&&people.every(x=>x.ready));
+ $('start-match').disabled=!(session.me.index===0&&people.length===count&&people.every(x=>x.ready));
  $('start-match').classList.toggle('hidden',session.me.index!==0);
  const host=session.me.index===0;
  const control=$('reveal-setting'),settings=data.room.revealSettings||{mode:'auto',seconds:2};
@@ -115,15 +124,32 @@ function renderLobby(data){
  $('reveal-help').textContent=settings.mode==='manual'?'Both players tap Continue after a reveal (90-second fallback).':`Cards are revealed to BOTH players for ${settings.seconds} seconds.`;
 }
 function beginPolling(){
- stopPolling();let live=true;
+ stopPolling();const epoch=pollEpoch;let fetching=false;
  async function sync(){
-  if(!live||!session)return;
-  if(document.visibilityState==='hidden'||actionBusy||pollBusy){pollTimer=setTimeout(sync,650);return;}
-  pollBusy=true;
-  try{const current=session;const data=await api('get',{code:current.code,token:current.token});if(session===current&&!actionBusy)updateRoom(data)}
-  catch(e){if(/expired|invalid token/i.test(e.message)){session=null;toast('ROOM EXPIRED — START A NEW ONE');show('setup');live=false;return;}}
-  finally{pollBusy=false}
-  if(live&&session)pollTimer=setTimeout(sync,screen==='lobby'?550:1000);
+  if(epoch!==pollEpoch||!session)return;
+  if(fetching||actionBusy||document.visibilityState==='hidden'){
+    pollTimer=setTimeout(sync,450);return;
+  }
+  if(!navigator.onLine){
+    networkStatus('offline');
+    pollTimer=setTimeout(sync,1200);return;
+  }
+  fetching=true;const current=session;
+  try{
+   const data=await api('get',{code:current.code,token:current.token});
+   if(epoch!==pollEpoch||session!==current)return;
+   pollDelay=0;networkStatus('connected');
+   if(!actionBusy)updateRoom(data);
+  }catch(error){
+   if(epoch!==pollEpoch||session!==current)return;
+   if(/expired|invalid token|session expired/i.test(error.message)){
+    networkStatus('offline');session=null;
+    toast('ROOM EXPIRED — REJOIN WITH A CODE');show('setup');stopPolling();return;
+   }
+   pollDelay=Math.min(8000,pollDelay?Math.ceil(pollDelay*1.6):1000);
+   networkStatus(navigator.onLine?'reconnecting':'offline');
+  }finally{fetching=false;}
+  if(epoch===pollEpoch&&session)pollTimer=setTimeout(sync,pollDelay|| (screen==='lobby'?550:1000));
  }
  sync();
 }
@@ -142,11 +168,68 @@ function queueRevealRefresh(){
   revealTimer=setTimeout(()=>{renderKey='';renderBattle()},ms);
  }
 }
+function showMultiRoundResult(last,me){
+ if(!last?.cards?.length)return;
+ const winner=last.winner;
+ const tie=last.kind==='tie';
+ const ownWin=winner===me;
+ const title=tie?'THE CARDS GO TO THE JACKPOT':ownWin?'YOU WON THE ROUND!':winner===null?'ROUND RESOLVED':escapeHtml(playerName(winner))+' WINS THE ROUND!';
+ const rows=last.cards.map((played,i)=>{
+  const character=card(played.id);
+  return '<span>'+escapeHtml(playerName(played.seat))+' · '+escapeHtml(character?.name||'CARD')+' <b>'+Number(last.values[i]).toLocaleString(undefined,{maximumFractionDigits:2})+'</b></span>';
+ }).join('');
+ const manual=game.reveal?.mode==='manual',acked=game.reveal?.acks?.includes(me);
+ $('result').className='result-pop compact '+(tie?'tie':ownWin?'win':'loss');
+ $('result').innerHTML='<div class="reveal-summary"><h3>'+title+'</h3><p>'+escapeHtml(last.stat.toUpperCase())+' · '+(tie?'All played cards are held aside.':'Cards move to the winning deck.')+'</p><div class="multi-result-values">'+rows+'</div></div><div class="reveal-action">'+(manual?'<button id="round-continue" class="btn btn-primary" '+(acked?'disabled':'')+'>'+(acked?'✓ READY':'CONTINUE →')+'</button>':'<span class="reveal-countdown">NEXT ROUND IN '+Math.max(0,Math.ceil((Date.parse(game.reveal.until)-Date.now())/1000))+'s</span>')+'</div>';
+ $('result').classList.remove('hidden');
+ if(manual&&!acked)$('round-continue').onclick=async()=>{
+  const button=$('round-continue');button.disabled=true;button.textContent='CONFIRMING…';
+  if(!(await roomAction('ack',{expectedRound:game.round}))){button.disabled=false;button.textContent='CONTINUE →'}
+ };
+}
+function renderMultiBattle(){
+ const count=game.playerCount,me=game.me,ended=game.status==='finished'||game.status==='aborted',active=revealing(),last=game.last;
+ const signature=['multi',game.matchNumber||1,game.round,game.status,game.chooser,game.counts.join(','),game.pot,active,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
+ if(renderKey===signature)return;
+ renderKey=signature;
+ document.querySelector('#battle .battle-meta').classList.add('hidden');
+ document.querySelector('#battle .tabletop').classList.add('hidden');
+ $('multi-arena').classList.remove('hidden');
+ $('round-number').textContent=String(game.round+(active||ended?0:1)).padStart(2,'0');
+ $('multi-arena').innerHTML=Array.from({length:count},(_,seat)=>{
+  const played=active?last?.cards?.find(x=>x.seat===seat):null;
+  const character=played?card(played.id):seat===me?game.topCard:null;
+  const outOfCards=game.counts[seat]===0&&!played;
+  return '<div class="multi-player '+(seat===me?'mine':'')+'"><div class="multi-player-heading"><span>'+escapeHtml(playerName(seat))+(seat===me?' (YOU)':'')+'</span><small>'+game.counts[seat]+' CARDS'+(outOfCards?' · OUT':'')+'</small></div><div class="battle-card multi-card">'+pokemonCard(character,active&&played?last.stat:'')+'</div></div>';
+ }).join('');
+ const canPlay=!active&&!ended&&game.chooser===me&&Boolean(game.topCard)&&!actionBusy&&networkState==='connected';
+ $('battle-status').textContent=active?'ROUND CARDS REVEALED':ended?'MATCH FINISHED':canPlay?'YOUR TURN TO CHOOSE':'WAITING FOR THE CATEGORY';
+ $('turn-power').textContent=active?'✦ REVIEW THE ROUND':ended?'✦ FINAL RESULT':game.chooser===me?'✦ YOU HAVE THE POWER':'⌛ '+playerName(game.chooser).toUpperCase()+' IS CHOOSING';
+ $('controls-title').textContent=ended?'THE SHOWDOWN IS OVER.':active?'EVERY PLAYER SEES THE SAME CARDS.':game.chooser===me?'PICK YOUR WINNING STAT.':'WAIT FOR THE CATEGORY CALL.';
+ $('control-subtitle').textContent=active?'The next turn unlocks after the shared reveal.':ended?'See the result above.':'Rank is the only category where lower wins.';
+ $('stat-buttons').innerHTML=STAT_FIELDS.map(s=>'<button class="stat-button" data-stat="'+s.key+'" '+(!canPlay?'disabled':'')+'><span>'+symbols[s.key]+' '+s.name+'</span><b>'+(game.topCard?Number(game.topCard[s.key]).toLocaleString(undefined,{maximumFractionDigits:2}):'—')+'</b></button>').join('');
+ $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>play(b.dataset.stat));
+ $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
+ $('call-dock').classList.toggle('hidden',session?.mode!=='remote');
+ const host=session?.me.index===0;
+ $('battle-settings-open').classList.toggle('hidden',!host||ended);
+ if(!host||ended)$('battle-settings-panel').classList.add('hidden');
+ const settings=lobbySnapshot?.room?.revealSettings||{mode:'auto',seconds:2};
+ if(document.activeElement!==$('battle-reveal-setting'))$('battle-reveal-setting').value=settings.mode+'-'+settings.seconds;
+ if(active)showMultiRoundResult(last,me);
+ else if(ended)showFinalResult(me);
+ else $('result').classList.add('hidden');
+ queueRevealRefresh();
+}
 function renderBattle(){
  if(!game)return;
+ if(!practice&&game.playerCount>2){renderMultiBattle();return;}
+ document.querySelector('#battle .battle-meta').classList.remove('hidden');
+ document.querySelector('#battle .tabletop').classList.remove('hidden');
+ $('multi-arena').classList.add('hidden');
  const me=practice?0:game.me,enemy=1-me,own=game.topCard;
  const active=revealing(),ended=game.status==='finished';
- const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||''].join('|');
+ const signature=[game.round,active,ended,game.endReason||'',game.chooser,game.counts.join(','),game.pot,game.reveal?.mode||'',(game.reveal?.acks||[]).join(','),game.last?.round||0,lobbySnapshot?.room?.revealSettings?.mode||'',lobbySnapshot?.room?.revealSettings?.seconds||'',networkState].join('|');
  if(renderKey===signature)return;
  renderKey=signature;
  $('round-number').textContent=String(game.round+(active?0:ended?0:1)).padStart(2,'0');
@@ -158,7 +241,7 @@ function renderBattle(){
  $('my-card').innerHTML=pokemonCard(myShown,showLast?last.stat:'');
  $('their-card').innerHTML=theirShown?pokemonCard(theirShown,last.stat):'<div class="card-back"><span>✦</span></div>';
  const chooser=game.chooser===me;
- const canPlay=!active&&!ended&&chooser&&!actionBusy;
+ const canPlay=!active&&!ended&&chooser&&!actionBusy&&(practice||networkState==='connected');
  $('battle-status').textContent=active?'BOTH CARDS REVEALED':ended?(game.winner===me?'MATCH WON':'MATCH OVER'):chooser?'YOUR TURN TO CHOOSE':'WAITING ON YOUR RIVAL';
  $('turn-power').textContent=active?'✦ REVIEW YOUR LAST BATTLE':ended?'✦ MATCH COMPLETE':chooser?'✦ YOU HAVE THE POWER':'⌛ YOUR RIVAL HAS THE POWER';
  $('controls-title').textContent=active?'REVIEW THE TWO POKÉMON.':ended?'THE SHOWDOWN IS OVER.':chooser?'THE NEXT MOVE IS YOURS.':'HOLD TIGHT. NEXT CARD IS COMING.';
@@ -184,10 +267,21 @@ function renderBattle(){
 }
 function showFinalResult(me){
  const forfeit=game.endReason==='forfeit',win=game.winner===me;
+ const wantsRematch=game.rematchVotes?.includes(me);
+ const votes=game.rematchVotes?.length||0;
+ const expected=game.playerCount||2;
+ const rematchAvailable=Boolean(session&&!forfeit&&session.players?.length===expected);
+ const action=practice?'REMATCH THE BOT ↗':rematchAvailable?(wantsRematch?'✓ REMATCH REQUESTED':'⚡ PLAY AGAIN — REMATCH ↗'):'BACK TO ROOMS ↗';
  $('result').className='result-pop final '+(win?'win':'loss');
- $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED BY FORFEIT'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':'50 CARDS · ONE LEGEND')+'</p><button class="btn btn-primary" id="play-again">'+(practice?'REMATCH THE BOT ↗':'BACK TO ROOMS ↗')+'</button>';
+ $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED BY FORFEIT'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':game.total+' CARDS · ONE LEGEND')+' · MATCH '+(game.matchNumber||1)+'</p><button class="btn btn-primary" id="play-again" '+(wantsRematch?'disabled':'')+'>'+action+'</button>'+(rematchAvailable?'<small class="rematch-status">'+(wantsRematch?'Waiting for the others to agree…':votes+'/'+expected+' players requested a rematch')+'</small>':'');
  $('result').classList.remove('hidden');
- $('play-again').onclick=()=>{if(practice)startPractice();else exitGame()};
+ $('play-again').onclick=async()=>{
+  if(practice)return startPractice();
+  if(!rematchAvailable)return exitGame();
+  const b=$('play-again');b.disabled=true;b.textContent='REQUESTING REMATCH…';
+  const ok=await roomAction('rematch');
+  if(!ok&&game?.status==='finished'){b.disabled=false;b.textContent=action}
+ };
 }
 function showRoundResult(last,me){
  if(!last?.cards?.length)return;
@@ -204,7 +298,7 @@ function showRoundResult(last,me){
  if(manual&&!acked){$('round-continue').onclick=async()=>{const b=$('round-continue');b.disabled=true;b.textContent='CONFIRMING…';const ok=await roomAction('ack',{expectedRound:game.round});if(!ok){b.disabled=false;b.textContent='CONTINUE →'}}}
 }
 async function play(key){
- if(game?.status!=='playing'||game.chooser!==(practice?0:game.me)||revealing()||actionBusy)return;
+ if(game?.status!=='playing'||game.chooser!==(practice?0:game.me)||revealing()||actionBusy||(!practice&&networkState!=='connected'))return;
  document.querySelectorAll('[data-stat]').forEach(b=>b.disabled=true);
  if(practice){
   try{practice=takeTurn(practice,0,key);game={...viewFor(practice,0),me:0,practice:true,reveal:{mode:'auto',seconds:2,acks:[],until:new Date(Date.now()+2000).toISOString()}};renderKey='';renderBattle();scheduleBot()}catch(e){toast(e.message)}
@@ -223,5 +317,5 @@ function scheduleBot(){
   try{practice=takeTurn(practice,1,key);game={...viewFor(practice,0),me:0,practice:true,reveal:{mode:'auto',seconds:2,acks:[],until:new Date(Date.now()+2000).toISOString()}};renderKey='';renderBattle();scheduleBot()}catch(e){toast(e.message)}
  },revealing()?2300:850);
 }
-async function exitGame(){if(session){try{await api('leave',{code:session.code,token:session.token})}catch{}}await disconnectCall();stopPolling();clearTimeout(botTimer);resetReveal();practice=null;game=null;session=null;callHealthChecked=false;$('battle-settings-panel').classList.add('hidden');lobbySnapshot=null;try{sessionStorage.removeItem('deckverse_session')}catch{}$('result').classList.add('hidden');show('setup')}
+async function exitGame(){if(session){try{await api('leave',{code:session.code,token:session.token})}catch{}}await disconnectCall();stopPolling();networkStatus('connected');clearTimeout(botTimer);resetReveal();practice=null;game=null;session=null;callHealthChecked=false;$('battle-settings-panel').classList.add('hidden');lobbySnapshot=null;try{sessionStorage.removeItem('deckverse_session')}catch{}$('result').classList.add('hidden');show('setup')}
 init();

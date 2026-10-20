@@ -10,11 +10,12 @@ export function revealDeadline(settings,now=Date.now()){
  const {mode,seconds}=validateRevealSettings(settings.mode,settings.seconds);
  return new Date(now+(mode==='manual'?90000:seconds*1000)).toISOString();
 }
-export function revealState({mode='auto',seconds=2,until=null,acks=[]}={},now=Date.now()){
+export function revealState({mode='auto',seconds=2,until=null,acks=[],required=2}={},now=Date.now()){
+ if(!Number.isInteger(required)||required<2||required>4)throw Error('Invalid participant count');
  const policy=validateRevealSettings(mode,seconds);
  const validUntil=until?Date.parse(until):NaN;
- const acknowledged=[...new Set(Array.isArray(acks)?acks.filter(x=>x===0||x===1):[])];
- const active=Number.isFinite(validUntil)&&now<validUntil&&(mode==='auto'||acknowledged.length<2);
- return {...policy,until:until||null,acks:acknowledged,active};
+ const acknowledged=[...new Set(Array.isArray(acks)?acks.filter(x=>Number.isInteger(x)&&x>=0&&x<required):[])];
+ const active=Number.isFinite(validUntil)&&now<validUntil&&(mode==='auto'||acknowledged.length<required);
+ return {...policy,until:until||null,acks:acknowledged,required,active};
 }
 export function mayAdvance(reveal,now=Date.now()){return !revealState(reveal,now).active}
