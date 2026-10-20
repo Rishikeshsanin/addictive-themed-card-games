@@ -2,6 +2,7 @@ import {STAT_FIELDS,DECKS,deckFor,card,art} from './catalog.js';
 import {newGame,takeTurn,viewFor,secureIndex} from './engine.js';
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let screen='landing',mode='same',session=null,game=null,practice=null,poll=null,latestRound=-1,renderedRound=-1,botTimer=null,call=null,callEnabled=false;
+let pollBusy=false,actionBusy=false,readyBusy=false,pollTimer=null,revealTimer=null,renderKey='',lobbySnapshot=null;
 const symbols={rank:'♛',height:'↕',weight:'◆',attack:'⚔',defense:'⬡',speed:'⚡',energy:'✧',hp:'♥'};
 const elements=['landing','setup','lobby','battle'];
 function show(id){screen=id;for(const el of elements)$(el).classList.toggle('hidden',el!==id);if(id!=='landing')window.scrollTo(0,0);if(id==='landing')location.hash='';if(id==='setup')checkRoomHealth();}
@@ -26,7 +27,9 @@ async function checkRoomHealth(){
  message.textContent='● ONLINE ROOMS ARE BEING CONNECTED — SOLO PRACTICE IS PLAYABLE';
  message.classList.add('offline');
 }
-function setupScreen(){clearInterval(poll);poll=null;clearTimeout(botTimer);practice=null;session=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
+function stopPolling(){clearInterval(poll);poll=null;clearTimeout(pollTimer);pollTimer=null;pollBusy=false;}
+function resetReveal(){clearTimeout(revealTimer);revealTimer=null;renderKey='';$('result').classList.add('hidden');}
+function setupScreen(){stopPolling();clearTimeout(botTimer);resetReveal();practice=null;session=null;lobbySnapshot=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
 function init(){
  $('player-name').value=localStorage.getItem('deckverse_name')||'';
  for(const b of ['top-play','hero-play','pokemon-tile'])$(b).addEventListener('click',setupScreen);
@@ -35,7 +38,8 @@ function init(){
  document.querySelectorAll('.mode-card').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('.mode-card').forEach(n=>n.classList.toggle('selected',n===b))}));
  $('create-room').onclick=()=>enterRoom('create');$('join-room').onclick=()=>enterRoom('join');$('practice-btn').onclick=startPractice;
  $('copy-code').onclick=async()=>{const code=session?.code;if(!code)return;const url=location.origin+'/?room='+code;try{await navigator.clipboard.writeText(url);toast('INVITE LINK COPIED ✦')}catch{toast('ROOM CODE: '+code)}};
- $('toggle-ready').onclick=()=>roomAction('ready',{ready:!session?.me?.ready});
+ $('toggle-ready').onclick=()=>toggleReady();
+ $('reveal-setting').onchange=async e=>{if(!session||session.me.index!==0||!lobbySnapshot)return;const [chosen,seconds]=e.target.value.split('-');const ok=await roomAction('settings',{mode:chosen,seconds:Number(seconds)});if(!ok)e.target.value=lobbySnapshot.room.revealSettings.mode+'-'+lobbySnapshot.room.revealSettings.seconds;};
  $('start-match').onclick=()=>roomAction('start');
  $('lobby-back').onclick=exitGame;$('battle-exit').onclick=exitGame;
  $('call-join').onclick=joinCall;$('call-leave').onclick=leaveCall;$('call-mic').onclick=toggleMic;$('call-camera').onclick=toggleCamera;
@@ -45,14 +49,70 @@ function init(){
  const room=new URLSearchParams(location.search).get('room');if(room&&/^[a-z0-9]{6}$/i.test(room)){$('join-code').value=room.toUpperCase();mode='remote';document.querySelector('[data-mode="remote"]').click();show('setup');toast('YOU HAVE AN INVITE — ENTER YOUR NAME TO JOIN')}
  try{const saved=JSON.parse(sessionStorage.getItem('deckverse_session')||'null');if(saved?.code&&saved?.token){session=saved;beginPolling();}}catch{}
 }
-function startPractice(){saveName();clearInterval(poll);poll=null;session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
+function startPractice(){saveName();stopPolling();resetReveal();session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
 const API='/api/game';
 async function api(action,body={}){let response;try{response=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})})}catch{throw Error('Cannot connect to the game server. Check your internet connection.')};const data=await response.json().catch(()=>({error:'Unexpected server response'}));if(!response.ok||data.error)throw Error(data.error||'Room request failed');return data}
 async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{const data=await api(action,{name,mode,code});session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
-async function roomAction(action,params={}){if(!session)return;try{const data=await api(action,{code:session.code,token:session.token,...params});updateRoom(data)}catch(e){toast(e.message)}}
-function updateRoom(data){if(!session)return;if(data.error){toast(data.error);return}const prev=game?.round??-1;session.me=data.me;session.mode=data.room.mode;session.players=data.players;game=data.game||null;sessionStorage.setItem('deckverse_session',JSON.stringify({code:session.code,token:session.token,mode:session.mode,me:session.me}));if(data.room.status==='lobby'){if(screen!=='lobby')show('lobby');renderLobby(data);return}if(data.room.status==='playing'||data.room.status==='finished'){if(screen!=='battle'){show('battle');renderedRound=-1;}renderBattle();if(game&&game.round>prev&&game.last)showRoundResult(game.last);}}
-function renderLobby(data){$('room-code').textContent=data.room.code;const people=data.players||[];$('lobby-players').innerHTML=[0,1].map(i=>{const p=people.find(x=>x.index===i);return '<div class="player-slot"><span>'+(p?(i===0?'⚡':'🔥'):'◇')+'</span><strong>'+escapeHtml(p?.name||'WAITING FOR RIVAL')+'</strong><small>'+(p?(p.ready?'● READY':'○ NOT READY'):'INVITE SOMEONE TO JOIN')+'</small></div>'}).join('');$('lobby-message').textContent=people.length<2?'Share the invite link or code with your friend.':people.every(x=>x.ready)?'Both players ready. Let the battle begin!':'Waiting for both players to get ready…';$('toggle-ready').textContent=session.me.ready?'✓ READY — TAP TO UNREADY':"I'M READY";$('start-match').disabled=!(session.me.index===0&&people.length===2&&people.every(x=>x.ready));$('start-match').classList.toggle('hidden',session.me.index!==0)}
-function beginPolling(){clearInterval(poll);async function sync(){if(!session||document.visibilityState==='hidden')return;try{const data=await api('get',{code:session.code,token:session.token});updateRoom(data)}catch(e){if(!/expired|invalid token/i.test(e.message))return;clearInterval(poll);poll=null;session=null;toast('ROOM EXPIRED — START A NEW ONE');show('setup')}}sync();poll=setInterval(sync,1400)}
+async function roomAction(action,params={}){
+ if(!session)return false;
+ actionBusy=true;
+ try{const data=await api(action,{code:session.code,token:session.token,...params});updateRoom(data);return true}
+ catch(e){toast(e.message);return false}
+ finally{actionBusy=false}
+}
+async function toggleReady(){
+ if(!session||readyBusy||!lobbySnapshot)return;
+ readyBusy=true;const desired=!session.me.ready;const previous=lobbySnapshot;
+ session.me={...session.me,ready:desired};
+ const players=previous.players.map(p=>p.index===session.me.index?{...p,ready:desired}:p);
+ renderLobby({...previous,me:session.me,players});
+ $('toggle-ready').disabled=true;
+ const ok=await roomAction('ready',{ready:desired});
+ if(!ok&&session){session.me={...session.me,ready:!desired};renderLobby(previous)}
+ readyBusy=false;$('toggle-ready').disabled=false;
+}
+function updateRoom(data){
+ if(!session||data.error)return;
+ session.me=data.me;session.mode=data.room.mode;session.players=data.players;
+ game=data.game||null;
+ lobbySnapshot=data;
+ sessionStorage.setItem('deckverse_session',JSON.stringify({code:session.code,token:session.token,mode:session.mode,me:session.me}));
+ if(data.room.status==='lobby'){if(screen!=='lobby')show('lobby');renderLobby(data);return}
+ if(data.room.status==='playing'||data.room.status==='finished'){
+  if(screen!=='battle'){show('battle');resetReveal()}
+  renderBattle();
+ }
+}
+function renderLobby(data){
+ if(!data?.room||!session)return;
+ $('room-code').textContent=data.room.code;
+ const people=data.players||[];
+ $('lobby-players').innerHTML=[0,1].map(i=>{const p=people.find(x=>x.index===i);return '<div class="player-slot"><span>'+(p?(i===0?'⚡':'🔥'):'◇')+'</span><strong>'+escapeHtml(p?.name||'WAITING FOR RIVAL')+'</strong><small>'+(p?(p.ready?'● READY':'○ NOT READY'):'INVITE SOMEONE TO JOIN')+'</small></div>'}).join('');
+ $('lobby-message').textContent=people.length<2?'Share the invite link or code with your friend.':people.every(x=>x.ready)?'Both players ready. Let the battle begin!':'Waiting for both players to get ready…';
+ $('toggle-ready').textContent=session.me.ready?'✓ READY — TAP TO UNREADY':"I'M READY";
+ $('toggle-ready').disabled=readyBusy;
+ $('start-match').disabled=!(session.me.index===0&&people.length===2&&people.every(x=>x.ready));
+ $('start-match').classList.toggle('hidden',session.me.index!==0);
+ const host=session.me.index===0;
+ const control=$('reveal-setting'),settings=data.room.revealSettings||{mode:'auto',seconds:2};
+ control.value=settings.mode+'-'+settings.seconds;
+ control.disabled=!host;
+ $('reveal-owner').textContent=host?'YOU ARE THE HOST':'ONLY THE HOST CAN EDIT';
+ $('reveal-help').textContent=settings.mode==='manual'?'Both players tap Continue after a reveal (90-second fallback).':`Cards are revealed to BOTH players for ${settings.seconds} seconds.`;
+}
+function beginPolling(){
+ stopPolling();let live=true;
+ async function sync(){
+  if(!live||!session)return;
+  if(document.visibilityState==='hidden'||actionBusy||pollBusy){pollTimer=setTimeout(sync,650);return;}
+  pollBusy=true;
+  try{const current=session;const data=await api('get',{code:current.code,token:current.token});if(session===current&&!actionBusy)updateRoom(data)}
+  catch(e){if(/expired|invalid token/i.test(e.message)){session=null;toast('ROOM EXPIRED — START A NEW ONE');show('setup');live=false;return;}}
+  finally{pollBusy=false}
+  if(live&&session)pollTimer=setTimeout(sync,screen==='lobby'?550:1000);
+ }
+ sync();
+}
 function playerName(i){if(practice)return i===0?displayName():'RIVAL BOT';return session?.players?.find(x=>x.index===i)?.name||('PLAYER '+(i+1))}
 function renderBattle(){
  if(!game)return;const me=practice?0:game.me,enemy=1-me,own=game.topCard,chooser=game.chooser===me,ended=game.status==='finished';
