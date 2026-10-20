@@ -106,10 +106,10 @@ test('every 560-card editorial row is CSV-exportable with severity and per-theme
  assert.ok(inventory.allCards.some(c=>c.flags.length>0));
 });
 test('reproducible seven-theme 2/3/4-seat seeded fairness and long-match controls',()=>{
- const options={seeds:4,seed:AUDIT_SEED,cap:1200,methods:['best','random','rank']};
+ const options={seeds:12,seed:AUDIT_SEED,cap:3000,methods:['best','random','rank']};
  const outcome=study(options);
  assert.equal(outcome.scenarios.length,7*3*3);
- assert.equal(outcome.attempts,7*(2+3+4)*4*3);
+ assert.equal(outcome.attempts,7*(2+3+4)*12*3);
  for(const s of outcome.scenarios){
   assert.equal(s.finished+s.roundCap+s.cycle,s.attempted);
   assert.equal(s.winningSeats.reduce((a,b)=>a+b,0),s.finished);
@@ -117,8 +117,8 @@ test('reproducible seven-theme 2/3/4-seat seeded fairness and long-match control
   assert.equal(Object.values(s.categoryCalls).reduce((a,b)=>a+b,0),s.allRounds);
   assert.ok(s.maxPot<=DECK_SIZE[s.size]);
   assert.ok(s.maxAward<=DECK_SIZE[s.size]);
-  assert.ok(s.fullyFinishedBlocks<=4);
-  assert.ok(s.medianRounds===null||s.medianRounds<=1200);
+  assert.ok(s.fullyFinishedBlocks<=12);
+  assert.ok(s.medianRounds===null||s.medianRounds<=3000);
  }
  const sample=study({...options,seeds:2});
  assert.deepEqual(sample,study({...options,seeds:2}),'Seeded study cannot depend on ambient RNG');
@@ -127,8 +127,8 @@ test('reproducible seven-theme 2/3/4-seat seeded fairness and long-match control
   const rows=outcome.scenarios.filter(x=>x.themeId===id);
   console.log('THEME FAIRNESS MEASURE '+JSON.stringify({theme:id,scenarios:rows.map(s=>({
    n:s.size,strategy:s.method,attempted:s.attempted,finished:s.finished,capped:s.roundCap,cycle:s.cycle,
-   firstChooser:s.firstChooserRateFullyCompleteBlocks,seatWins:s.winningSeats,
-   median:s.medianRounds,p90:s.p90Rounds,longest:s.longestRounds,ties:s.tieRounds,
-   maxPot:s.maxPot,maxAward:s.maxAward}))}));
+   firstChooser:s.firstChooserRateFullyCompleteBlocks,firstChooserCI:s.firstChooserCI95,clusters:s.fullyFinishedBlocks,seatWins:s.winningSeats,
+   median:s.medianRounds,p90:s.p90Rounds,p99:s.p99Rounds,longest:s.longestRounds,ties:s.tieRounds,
+   allRounds:s.allRounds,maxPot:s.maxPot,maxAward:s.maxAward}))}));
  }
 });
