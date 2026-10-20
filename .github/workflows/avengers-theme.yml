@@ -1,0 +1,42 @@
+name: Avengers Saga Preview QA
+on:
+  pull_request:
+    paths:
+      - "themes/avengers/**"
+      - "tests/avengers-theme.test.js"
+      - ".github/workflows/avengers-theme.yml"
+  workflow_dispatch:
+jobs:
+  standalone-avengers-preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate theme script syntax
+        run: |
+          node --check themes/avengers/data.js
+          node --check themes/avengers/engine.js
+          node --check themes/avengers/app.js
+      - name: Test Avengers rules, lore ratings and invariants
+        run: node --test tests/avengers-theme.test.js
+      - name: Serve static site
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/deckverse-avengers-server.log 2>&1 &
+          sleep 1
+      - name: Chrome mobile and desktop theme smoke
+        run: node themes/avengers/qa/browser-smoke.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - name: Save true browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: avengers-saga-ui
+          path: /tmp/deckverse-avengers-*.png
+          if-no-files-found: ignore
