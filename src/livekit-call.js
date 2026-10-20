@@ -1,6 +1,6 @@
 // DeckVerse-only optional calls. Media state never participates in game resolution.
 // The LiveKit SDK is loaded on demand, only after an explicit player click.
-const SDK_URL='https://cdnjs.cloudflare.com/ajax/libs/livekit-client/2.15.3/livekit-client.esm.mjs';
+const SDK_URL='https://esm.sh/livekit-client@2.15.3';
 const $=id=>document.getElementById(id);
 let room=null, sdk=null, busy=false, minimized=false, cameraFacing='user',localMedia=null;
 let activeEpoch=0;
