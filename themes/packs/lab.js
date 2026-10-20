@@ -49,7 +49,8 @@ function closeDetails(){
 }
 function start(){
  clearTimers();
- state.game=startPackMatch({themeId:state.themeId,playerCount:Number($('players').value)});
+ const qaFirst=(['127.0.0.1','localhost'].includes(location.hostname)&&new URLSearchParams(location.search).has('qa-first'))?0:null;
+ state.game=startPackMatch({themeId:state.themeId,playerCount:Number($('players').value),chooser:qaFirst});
  state.showdown=false;$('game').classList.remove('hidden');$('end').classList.remove('hidden');$('start').textContent='↻ NEW MATCH';
  renderGame();scheduleBot();
  $('arena').scrollIntoView({behavior:'smooth',block:'start'});
