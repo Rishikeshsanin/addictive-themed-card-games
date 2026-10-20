@@ -194,11 +194,18 @@ async function measure(page,stage,players,width){
   const buttons=[...document.querySelectorAll('#stat-buttons button:not([disabled])')];
   const dock=document.querySelector('#call-dock');
   const rect=dock?.getBoundingClientRect();
-  const overlap=dock&&!dock.classList.contains('hidden')?buttons.filter(b=>{
-   const r=b.getBoundingClientRect();return r.left<rect.right&&r.right>rect.left&&r.top<rect.bottom&&r.bottom>rect.top;
-  }).length:0;
+  const occlusion=dock&&!dock.classList.contains('hidden')?buttons.map(b=>{
+   const r=b.getBoundingClientRect();
+   const left=Math.max(r.left,rect.left),right=Math.min(r.right,rect.right);
+   const top=Math.max(r.top,rect.top),bottom=Math.min(r.bottom,rect.bottom);
+   if(right-left<3||bottom-top<3)return {overlap:false,intercepted:false};
+   const hit=document.elementFromPoint((left+right)/2,(top+bottom)/2);
+   return {overlap:true,intercepted:!!hit&&dock.contains(hit)};
+  }):[];
   return {scrollX,rawOverflow:document.documentElement.scrollWidth-innerWidth,clipped,
-   blockedPlayableButtons:overlap,visibleControls:buttons.length,clientWidth:innerWidth};
+   overlappingButtons:occlusion.filter(x=>x.overlap).length,
+   blockedPlayableButtons:occlusion.filter(x=>x.intercepted).length,
+   visibleControls:buttons.length,clientWidth:innerWidth};
  });
  assert.ok(report.scrollX<=2,`${stage} ${players}P ${width}px horizontal scroll: ${JSON.stringify(report)}`);
  assert.equal(report.clipped.length,0,`${stage} ${players}P ${width}px clipped controls: ${JSON.stringify(report)}`);
@@ -351,6 +358,12 @@ test('LiveKit synthetic camera/mic permissions, calls, cleanup, visibility and r
     const overlap=await measure(p,'expanded call',2,size.width);
     if(overlap.blockedPlayableButtons>0)
      await p.screenshot({path:'/tmp/deckverse-final-call-overlap-'+size.width+'.png',fullPage:true});
+    // Toggle both directions after resizing: consent and camera state must persist.
+    await p.locator('#call-minimize').click();
+    assert.equal(await dock.evaluate(el=>el.classList.contains('minimized')),true);
+    await p.locator('#call-minimize').click();
+    assert.equal(await dock.evaluate(el=>el.classList.contains('minimized')),false);
+    assert.equal(await p.evaluate(()=>window.__qaRooms[0].localParticipant.isCameraEnabled),true);
     assert.equal(await p.locator('#call-join').count(),1);
    }
    // Remote subscription duplication and listener/media cleanup are simulated; not a true WebRTC peer.
