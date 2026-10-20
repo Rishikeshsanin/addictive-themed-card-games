@@ -50,6 +50,13 @@ The bootstrap intentionally fails if roles/tables already exist; start with a fr
 
 **Terminology:** "real API + disposable PostgreSQL" does not mean deployed V2. "Synthetic browser verified" does not imply physical iPhone or Android. Calling fixture uses a stubbed client; it does not establish peer-to-peer audio, prove autoplay semantics on Safari, or test actual LiveKit ICE/DTLS reconnection.
 
+## Findings from initial isolated CI executions
+
+- The new CI PostgreSQL 16 TLS service, synthetic V1 fixture, local scoped application of SQL 004/005/006, and **all 6 LiveKit lifecycle mock tests passed** in the first dedicated workflow.
+- Real local API + browser **2-player** create/join/start, offline→online+refresh preservation, mocked LiveKit token access checks, synthetic mic/camera controls and unanimous seeded rematch passed before later checks.
+- The next CI run exposed a **tablet responsive defect**: on a 3-player battle, **seat 1 at 768px viewport**, `document.documentElement.scrollWidth > innerWidth + 2px`. Agent E cannot modify shared CSS/HTML. The suite now captures overflow in an artifact, continues through other scenarios, and **fails at the end** to maintain a visible release gate. **Coordinator/Agent D action:** fix the 3P responsive overflow after inspecting the recorded overwide elements/screenshots, and rerun.
+- These are *partial* findings; the dedicated CI remains a failing release gate until all tests finish successfully. Do not mistake the independent legacy CI success for integrated mobile QA success.
+
 ## CI reproducibility and performance
 
 - `artifacts/db-integration-mobile/results.json`: scenario results, action type, sample counts, min/p50/p95/max timings in **milliseconds**. Report only numbers emitted by completed runs; never invent a production latency.
