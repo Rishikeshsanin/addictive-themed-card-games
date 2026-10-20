@@ -10,6 +10,7 @@ async function waitReady(button){await button.waitFor({state:'visible',timeout:1
 try{
  await host.goto(URL,{waitUntil:'domcontentloaded',timeout:20000});
  await host.locator('#pokemon-tile').click();
+ await host.locator('[data-mode="remote"]').click();
  await host.locator('#player-name').fill('QA Browser Host');
  await host.locator('#create-room').waitFor({state:'visible'});
  await host.waitForFunction(()=>!document.getElementById('create-room').disabled,{timeout:12000});
@@ -34,6 +35,10 @@ try{
  await host.locator('#start-match').click();
  await host.locator('#my-card .card-name').waitFor({timeout:16000});
  await guest.locator('#my-card .card-name').waitFor({timeout:16000});
+ assert.equal(await host.locator('#call-dock').isVisible(),true,'Remote Room must offer optional LiveKit controls');
+ assert.equal(await guest.locator('#call-dock').isVisible(),true,'Guest must also see optional call dock');
+ assert.equal(await host.locator('#call-join').isVisible(),true,'Calls are opt-in and do not start automatically');
+
  assert.equal(await host.locator('#battle-settings-open').isVisible(),true,'Host sees in-match settings');
  assert.equal(await guest.locator('#battle-settings-open').isVisible(),false,'Guest cannot edit host reveal settings');
  const chooser=await host.locator('#turn-power').textContent();
