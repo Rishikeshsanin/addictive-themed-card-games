@@ -1,6 +1,6 @@
 # DeckVerse Round 4 — V2 CI Parity Review
 
-**Agent:** B — test-only integration verification. **Status: review-only / pending fresh CI at the initial document commit.**  
+**Agent:** B — test-only integration verification. **Status: seven/ seven workflow lanes passed on the initial parity PR code head `b0910f7db7e1b998027c9aa506975a8a7150710f`; still DRAFT / NOT production-approved.**  
 **Exact parent:** `integration/deckverse-v2-theme-preview-20261020` at `c3d58abd7fcba152b92df1ffda57fedd4049c74e` (PR #31 head).  
 **Test-only branch:** `agent/b-v2-ci-parity`. No runtime, API, rosters, LiveKit, migrations, production settings or real Supabase objects changed.
 
@@ -37,16 +37,26 @@ No test was silenced or skipped to achieve parity. The source files and applicat
 
 | Required GitHub Actions workflow | What it proves | Current PR result |
 | --- | --- | --- |
-| DeckVerse CI | Unit rules, 2K seeded games, 3/4 simulations, Chrome/client, synthetic media regression | **Pending** |
-| DeckVerse PostgreSQL 17.6 schema parity | Historical V1 preservation, 004/005/006 rerun, app scope/RLS, pre-migration restore | **Pending** |
-| DeckVerse disposable PostgreSQL rate-limit QA | Real SQL 200-way concurrency, spoofed identities, throttling, sharing, cleanup | **Pending** |
-| DeckVerse isolated DB + mobile integration QA | Real HTTP/DB and synthetic Chrome mobile/audio permissions | **Pending** |
-| Disposable DB presence validation | Schema, heartbeat/host transfer, recovery, RLS | **Pending** |
-| DeckVerse disposable PostgreSQL multiplayer QA | 2P/3P/4P full HTTP+SQL and mobile browsers | **Pending** |
-| DeckVerse Theme Packs QA | Seven experimental solo theme inventories/engine/desktop+mobile browser | **Pending** |
+| DeckVerse CI | 106/106 Node unit tests, classic/multiplayer simulations, Chrome/client, synthetic media regressions | **[PASS #39479143143](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479143143)** |
+| DeckVerse PostgreSQL 17.6 schema parity | `server_version_num=170006`, V1 fingerprint, twice-replayed 004/005/006, RLS, 2P/3P capacity, restore into new DB | **[PASS #39479143420](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479143420)** |
+| DeckVerse disposable PostgreSQL rate-limit QA | 200 concurrent SQL calls from eight pools, 31 admitted / 169 denied, 11/11 tests, 361 same-IP polls admitted, expiry/index/cleanup | **[PASS #39479143265](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479143265)** |
+| DeckVerse isolated DB + mobile integration QA | 2/3/4 player rooms, live DB/local HTTP, expanded dock controls unblocked, synthetic media, offline/resume, HTTP 429 | **[PASS #39479143336](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479143336)** |
+| Disposable DB presence validation | 20/20 tests, SQL presence/host/reconnect invariants | **[PASS #39479143586](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479143586)** |
+| DeckVerse disposable PostgreSQL multiplayer QA | Full two/three/four-player HTTP+SQL matches, browser secrecy, concurrency and 2 match epochs per size | **[PASS #39479143725](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479143725)** |
+| DeckVerse Theme Packs QA | 7/7 unit tests and Chrome at 320, 390, 768 and 1366px for seven solo packs | **[PASS #39479143148](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39479143148)** |
 
 Success requires these runs to finish **on the parity branch head or its pull-request merge commit** with no unexpected skips; GitHub action success alone is not proof of production Vercel, real LiveKit cloud, physical phones or Hub configuration.
 
+
+### Actual fresh-run findings
+
+- **PG17 release rehearsal:** 004, 005 and 006 each applied **twice** to disposable PostgreSQL 17.6, preserved a synthetic legacy V1 fingerprint, rejected an illegal seat-2 join in a two-seat room, accepted a valid third seat in a three-player room, and restored the pre-migration backup to an independent new database. The expected SQL error for the rejected seat is a **passing negative test**, not a CI failure.
+- **Durable limiter:** 200 attempts, 8 pools/24 maximum connections, 31 admitted, 169 rejected and one persisted counter capped at 31; burst p95 161.93ms including pool contention. Four friends behind one IP completed 361 polls with 0 denials (SQL limiter p95 0.96ms). RLS/permissions, 429 and Retry-After, malformed/forged IP protections, bounded 700-row cleanup and 12K-row expiry-index selection all passed.
+- **Integrated PostgreSQL + mobile:** synthetic browsers at 320/390/768/1366 widths exercised 2/3/4-player room flows and reconnect. Expanded LiveKit panel at 390px produced zero blocked controls; calling uses **fake** media/SDK credentials, not production LiveKit. API create quota returned 429 with Retry-After in a synthetic browser test.
+- **Multiplayer:** real local HTTP against disposable PostgreSQL ran completed games and rematches for 2/3/4 players, concurrency and host recovery. The final HTTP test reported 954 API calls and six complete matches, with no failed tests. Core CI included 106 passing unit tests; presence 20, themes 7.
+- **No unexpected failures** were observed in the seven required workflows. No test step or existing CI assertion was disabled. Runner timing values are neither production throughput claims nor physical-phone evidence.
+
+**Evidence snapshot note:** Those seven GitHub Actions links test the source and QA changes at commit `b0910f7db7e1b998027c9aa506975a8a7150710f`. This annotation-only document update does not change the tested workflows or runtime. Its own subsequent PR head must also show green checks before coordinator consolidation.
 ## Safety / release recommendation
 
 1. **Preferred consolidated development baseline:** PR #31's branch **plus this QA-only parity PR**, conditional on seven actual green workflows and confirmation that it still contains all original theme and runtime blob IDs. Prefer this over #29 alone because #29 lacks the preview themes; prefer over #30/#31 alone because they lack the verified full CI matrix.
