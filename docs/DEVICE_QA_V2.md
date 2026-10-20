@@ -74,7 +74,7 @@ Suggested evidence table: test ID, devices/OS/browser/network, candidate commit/
 
 ### Executed versus pending
 
-- **PASS — Node + mocked LiveKit SDK**: `node --test tests/livekit-mobile-lifecycle.mjs` — 5/5 on Node 22.16.0, covering lazy connect, mic toggles/labels, deduplicated tracks, multiple cameras, audio unlock, camera switching, permission problems, reconnected/failed disconnect UI, stop/detach/listener cleanup and abort of an in-flight token fetch. Test uses simulated DOM and simulated participant/events; no real packets are exchanged.
+- **PASS — Node + mocked LiveKit SDK**: `node --test tests/livekit-mobile-lifecycle.mjs` — 6/6 on Node 22.16.0, covering lazy connect, mic toggles/labels, deduplicated tracks, multiple cameras, audio unlock, camera switching, permission problems, reconnected/failed disconnect UI, stop/detach/listener cleanup, abort of an in-flight token fetch and safe 403 authorization error handling. Test uses simulated DOM and simulated participant/events; no real packets are exchanged.
 - **PASS — JS syntax**: `node --check src/livekit-call.js` (local).
 - **Previously verified on production baseline, not rerun against this change**: two independent desktop Chrome sessions with synthetic microphone/camera published and received LiveKit Cloud media (`tests/livekit-browser.mjs`). This is neither physical-mobile evidence nor Agent E branch verification.
 - **NOT RUN on this branch**: real LiveKit Cloud two-way audio/video, browser emulation with actual WebRTC, expired real token, real 4G↔Wi-Fi handoff, Safari/iOS or Android device capture, real multi-device camera switching, screen recordings, or long call soak. Do not label these PASS.
