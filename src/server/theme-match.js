@@ -181,12 +181,27 @@ export function themeViewFor(previous,viewer,{roomThemeId}={}){
   if(id==='pokemon')return previous.players.length===2?
     viewFor(previous,viewer):multiViewFor(previous,viewer);
   const own=previous.players[viewer].deck;
-  const last=previous.last?clone(previous.last):null;
-  if(last){
-    last.cards=previous.players.length===2?
-      last.cards.map(cardId=>getServerCard(id,cardId)):
-      last.cards.map(card=>({seat:card.seat,...getServerCard(id,card.id)}));
-    delete last.awarded; // Never include hidden pot/deck-order attribution.
+  // Explicit public projection: never forward opaque/new server-state keys from
+  // persisted last-round JSON. In particular pot awards and future decks stay
+  // private even if a future engine revision adds internal fields.
+  let last=null;
+  if(previous.last){
+    const source=previous.last;
+    check(Array.isArray(source.cards)&&Array.isArray(source.values)&&
+      Array.isArray(source.counts),'Malformed last-round record');
+    last={
+      round:source.round,stat:source.stat,values:[...source.values],
+      kind:source.kind,winner:source.winner,counts:[...source.counts],
+      pot:source.pot
+    };
+    if(previous.playerCount!==2)last.awardedCount=source.awardedCount;
+    last.cards=previous.playerCount===2?
+      source.cards.map(cardId=>getServerCard(id,cardId)):
+      source.cards.map(card=>{
+        check(card&&Number.isInteger(card.seat)&&
+          card.seat>=0&&card.seat<previous.playerCount,'Malformed played seat');
+        return {seat:card.seat,...getServerCard(id,card.id)};
+      });
   }
   const base={version:previous.version,themeId:id,playerCount:previous.playerCount,
     status:previous.status,round:previous.round,chooser:previous.chooser,
