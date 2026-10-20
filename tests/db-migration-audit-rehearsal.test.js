@@ -77,7 +77,7 @@ test('004->005->006 apply and rerun against disposable PostgreSQL preserving leg
       assert.equal(sql("SELECT count(*) FROM deckverse.rooms WHERE player_count=2 AND host_seat=0 AND presence_version=0"),'2');
       assert.equal(sql("SELECT count(*) FROM deckverse.players WHERE left_at IS NULL"),'3');
       assert.equal(sql("SELECT count(*) FROM pg_constraint WHERE conrelid='deckverse.players'::regclass AND conname='players_seat_check'"),'1');
-      assert.match(sql("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='deckverse.players'::regclass AND conname='players_seat_check'"),/seat\\s*>=\\s*0.*seat\\s*<=\\s*3|BETWEEN\\s+0\\s+AND\\s+3/i);
+      assert.match(sql("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='deckverse.players'::regclass AND conname='players_seat_check'"),/seat *>= *0.*seat *<= *3|BETWEEN +0 +AND +3/i);
       assert.equal(sql("SELECT relrowsecurity::text||':'||relforcerowsecurity::text FROM pg_class WHERE oid='deckverse.rate_limit_counters'::regclass"),'true:true');
       assert.equal(sql("SELECT count(*) FROM pg_policies WHERE schemaname='deckverse' AND tablename='rate_limit_counters' AND policyname='deckverse_app_rate_limit_counter_rw'"),'1');
       assert.equal(sql("SELECT count(*) FROM pg_indexes WHERE schemaname='deckverse' AND indexname='deckverse_rate_limit_expiry_idx'"),'1');
