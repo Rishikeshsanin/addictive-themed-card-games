@@ -8,7 +8,7 @@
 - Project Hub app #16: `deckverse`, schema `deckverse`; tables `deckverse.rooms` and `deckverse.players` with RLS. Initial security advisor had zero DeckVerse findings.
 - Role `deckverse_app` has LOGIN enabled and is restricted to DeckVerse's own tables. Vercel's `DECKVERSE_DATABASE_URL` is configured as a sensitive production variable. **Online rooms are connected and tested.**
 - Host-configurable card reveals, server-enforced manual acknowledgements and Mumbai Vercel serverless functions deployed. Chrome desktop/mobile tests and real two-mobile-browser rooms passed in GitHub Actions run 39384472880.
-- No LiveKit credentials configured. **Remote voice/video is not connected yet.**
+- LiveKit credentials are configured. Two independent Chrome sessions have connected to LiveKit Cloud with synthetic microphone/camera media; physical-phone field testing remains pending.
 
 ## Dedicated database connection — configured and verified
 
@@ -18,13 +18,13 @@
 - Project Hub's other applications remain out of scope. Avoid all changes outside the `deckverse` schema.
 - Run after deploying: `https://addictive-themed-card-games.vercel.app/api/game?health=1`.
 
-## LiveKit calling — setup needed
-Create or designate a LiveKit environment specifically authorized for DeckVerse. In the **new DeckVerse Vercel project**, configure:
+## LiveKit calling — configured, field QA pending
+The DeckVerse Vercel project has the following server-only variables configured:
 - `LIVEKIT_URL`
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
 
-Do not expose the last two values to frontend code or commits. Token endpoint `/api/livekit-token` verifies the app-scoped database role and active remote-room membership, only then issues a short-lived room-specific token. Calling must be independently tested from two phones and microphone/camera-denial flows.
+Do not expose the last two values to frontend code or commits. Token endpoint `/api/livekit-token` verifies the app-scoped database role and active remote-room membership, only then issues a short-lived room-specific token. Synthetic two-browser media has passed; real iPhone/Android permission, autoplay, backgrounding and network-loss tests remain required.
 
 ## Supabase safety contract
 Always read `hub.read_me_first` and the repository's `AGENTS.md` and `SUPABASE_HUB_RULES.md` before database activity. All schema names must remain `deckverse.*`. No shared service-role/database role keys in app, no public tables, and no unrelated-app mutations. Run the Supabase security advisor after meaningful DeckVerse DDL.
@@ -33,7 +33,7 @@ Always read `hub.read_me_first` and the repository's `AGENTS.md` and `SUPABASE_H
 1. CI green on deployed commit, including local Chrome desktop/mobile and remote two-mobile-browser smoke — **verified in automated CI**.
 2. Distinct-browser room code, join, ready, play, both-card reveal and manual continue — **verified in CI**. Physical mobile phones, ties, endgame and rematch still need dedicated field QA.
 3. Verify no player can inspect the other player's future deck or manipulate another player's turn.
-4. Verify real microphone/video connection and fail-gracefully behavior.
+4. Verify microphone/video and fail-gracefully behavior on physical iPhone and Android devices; synthetic Chrome media is already verified.
 5. Measure first-chooser match advantage, match-length tails and device performance with finalized card data.
 6. Resolve Pokémon imagery/names intellectual-property licensing before unrestricted commercial launch.
 7. Verify Vercel deployment protection doesn't prevent intended public access.
@@ -50,12 +50,6 @@ Nothing else should be reported production-ready until these items are green.
 - Token issuance checks the private DeckVerse room, active membership, `remote` room type and active match. It returns a token restricted to `deckverse-<room_uuid>`; no LiveKit key is sent to the browser.
 - `GET /api/livekit-token` returns only `{"configured": true/false}` (never credentials) so the UI can explain missing LiveKit setup.
 
-**Still required for real voice/video:**
-1. Create your own LiveKit Cloud project for DeckVerse at https://cloud.livekit.io/, distinct from any existing Imposter X project (unless you explicitly authorize reuse).
-2. Copy its WebSocket URL (`wss://...`) and API key and secret from that project's credentials.
-3. In Vercel > addictive-themed-card-games > Settings > Environment Variables, add 3 **Secret** production variables: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`.
-4. Redeploy only DeckVerse. Do not paste secrets into GitHub or ChatGPT and do not change Imposter X credentials.
-5. Verify `GET /api/livekit-token` reports `configured:true`, then open a **Remote Room** on two phones, start the match, click Join Voice, permit microphone, and separately try optional cameras. Test denied permissions, disconnect, reconnect, backgrounding and mobile browser autoplay rules.
-6. Real LiveKit end-to-end verification cannot pass until these variables exist.
+**Still required for field readiness:** open a Remote Room on physical iPhone and Android devices, start the match, join voice, permit microphone, and separately try optional cameras. Test denied permissions, disconnect, reconnect, backgrounding and mobile browser autoplay rules. Rotate the previously exposed LiveKit key as a separate credential-maintenance task; do not place its value in issues, documentation, chat, or commits.
 
-**Keep this honest:** JavaScript code, API guard and browser UI can pass without actual media connectivity; those tests are not proof of a successfully established LiveKit room.
+**Verification boundary:** automated tests prove a real LiveKit Cloud connection with synthetic Chrome media, not physical-device behavior or hostile-network recovery.

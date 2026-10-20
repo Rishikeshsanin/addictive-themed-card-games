@@ -13,7 +13,8 @@ const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const allowedAction=new Set(['create','join','get','ready','start','select','settings','ack','leave']);
 let verified=false;
 async function connected(){if(!sql)throw fail('Game rooms are awaiting an isolated database connection. Solo practice is available.',503);if(!verified){const [r]=await sql`select current_user as role`;if(r.role!=='deckverse_app')throw fail('Game backend configuration failed its dedicated-role security check.',503);verified=true;}return sql}
-const safeName=n=>{if(typeof n!=='string'||n.trim().length<2||n.trim().length>24||/[<>]/.test(n))throw fail('Name must be 2–24 characters without HTML symbols.');return n.trim()};
+export const safeName=n=>{if(typeof n!=='string'||n.trim().length<2||n.trim().length>24||/[<>\p{Cc}\p{Cf}]/u.test(n))throw fail('Name must be 2–24 visible characters without HTML symbols.');return n.trim()};
+export const safeMode=mode=>{if(mode!=='same'&&mode!=='remote')throw fail('Invalid room mode.');return mode};
 const safeCode=c=>{if(typeof c!=='string'||!/^[A-Z0-9]{6}$/.test(c))throw fail('Invalid six-character room code.');return c};
 const safeToken=t=>{if(typeof t!=='string'||!/^[0-9a-f]{64}$/.test(t))throw fail('Invalid session token.',401);return hash(t)};
 async function auth(tx,room,token){const [p]=await tx`select seat,name,ready from deckverse.players where room_id=${room.id} and token_hash=${safeToken(token)} and active=true limit 1`;if(!p)throw fail('Session expired. Rejoin with the room code.',401);return {index:p.seat,name:p.name,ready:p.ready}}
@@ -30,7 +31,7 @@ async function snapshot(db,code,token){
  return {room:{code:room.code,mode:room.mode,status:room.status,revealSettings:{mode:room.reveal_mode,seconds:room.reveal_seconds}},players:rows.map(p=>({index:p.seat,name:p.name,ready:p.ready})),me,game};
 }
 async function create(db,b){
- const name=safeName(b.name),mode=b.mode==='remote'?'remote':'same',raw=secret(),digest=hash(raw);
+ const name=safeName(b.name),mode=safeMode(b.mode),raw=secret(),digest=hash(raw);
  const [active]=await db`select count(*)::integer as count from deckverse.rooms where expires_at>now() and status in ('lobby','playing')`;if(active.count>300)throw fail('Active-room capacity reached. Try again later.',429);
  for(let tries=0;tries<6;tries++){
  const c=code();try{
@@ -88,7 +89,7 @@ async function action(db,b){
 }
 export default async function handler(req,res){
  res.setHeader('cache-control','no-store');res.setHeader('x-content-type-options','nosniff');
- if(req.method==='GET'){if(req.url.includes('health')){try{await connected();return res.status(200).json({status:'ready',app:'deckverse'})}catch{return res.status(503).json({status:'setup_required',app:'deckverse'})}}return res.status(405).json({error:'POST required.'})}
+ if(req.method==='GET'){if(new URL(req.url,'https://deckverse.invalid').searchParams.has('health')){try{await connected();return res.status(200).json({status:'ready',app:'deckverse'})}catch{return res.status(503).json({status:'setup_required',app:'deckverse'})}}return res.status(405).json({error:'POST required.'})}
  if(req.method!=='POST')return res.status(405).json({error:'POST required.'});
  try{
   const db=await connected();let b=req.body;
