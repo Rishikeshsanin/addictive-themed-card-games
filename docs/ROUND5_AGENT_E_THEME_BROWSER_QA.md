@@ -61,6 +61,19 @@ The script prints `ROUND5_PASS API browser matrix` 24 times, plus `ROUND5_FINAL_
 - Theme intellectual-property rights, fairness, performance on physical devices and commercial publication are separate launch gates.
 - **Release posture: DRAFT / NO-GO for a public eight-theme online multiplayer claim until Agent C's combined UI passes, independently audited DB/security checks remain green and physical device tests exist.**
 
-## Executed CI evidence
+## Executed CI evidence — 2026-10-20
 
-To be populated only after runs finish on this branch. A standard `DeckVerse CI` success alone is not proof that the 24-case integrated runner actually ran: inspect the `ROUND5_...` log records and screenshots before claiming the matrix passed.
+**Verified test-source/head commit:** `17e98023713c8da138ba2889c5d67e4f0f525404`.
+
+- [DeckVerse CI run 39486242723 — SUCCESS](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39486242723). It actually ran the Docker+PostgreSQL bootstrap, checked-in 007 migration, authentic API, and independent Chromium contexts. **141/141 `npm test` tests passed; 0 failed; 0 skipped.**
+- The log contains **24 individual `ROUND5_PASS API browser matrix` results**, covering all eight canonical themes at **2/3/4 players** and final `ROUND5_FINAL_API_MATRIX_PASS`. Every case explicitly marks `frontend:"PENDING_AGENT_C"`.
+- Verified creation, immutable themes, guest join and ready, duplicate ready/start, first server-authoritative turn, stale/duplicate turn rejection, private per-seat server views, conservation of 50/60/80 cards, seeded finished-state rematch with original roster and immutable theme and stale rematch rejection.
+- Representative three-player Pokémon case explicitly passed **offline/online, host transfer after an eight-minute fictional DB timestamp, paused selection rejection, resumed host connectivity, unchanged card decks**. This is NOT an eight-theme host-transfer claim.
+- `ROUND5_DB_SETUP_PASS` confirmed the fictional CI schema was migrated through 007, including the DB immutable theme trigger. Disposable PostgreSQL 16 was removed after the run.
+- **6/6 synthetic LiveKit lifecycle regression tests passed** within the new CI runner, with browser fake camera/microphone capture stopped. No LiveKit Cloud or physical devices.
+- [CI Chromium screenshot artifact `deckverse-browser-screenshots`](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39486242723/artifacts/12294345547) (~8.8 MB), including `deckverse-round5-baseline-{320,390,768,1366}.png`. **These are pre-Agent-C Pokémon UI baseline screenshots**.
+- The script emitted geometry metrics for all four baseline widths. Current pre-Agent-C scripted checks use **real Chromium**, but they do not prove the eight-theme setup, themed battle cards, dynamic labels, call-dock expansion on all themes or C's accessibility contract.
+- **Agent C draft PR #42** is available separately at [PR #42](https://github.com/Rishikeshsanin/addictive-themed-card-games/pull/42). Its own CI success is not the same as a combined C+E run. The coordinator must construct and test a combined candidate and retain both agents' ownership boundaries.
+- There is no measured production performance, actual Safari/Chrome handset test, third-party asset licensing sign-off or live end-to-end WebRTC call test.
+
+**Result: API/SQL/browser QA conditional PASS, full themed frontend/browser release gate PENDING.** Keep draft / do not deploy or merge for public release.

@@ -51,7 +51,10 @@ try{
  game.revealPolicy={mode:'auto',seconds:2};
  assert.equal(validateServerThemeMatch(game,'pokemon'),true);
  const token0='a'.repeat(64),token1='b'.repeat(64);
- await admin.unsafe("UPDATE deckverse.rooms SET state=$1::jsonb WHERE code='ABC123'",[JSON.stringify(game)]);
+ const seeded=await admin.unsafe("UPDATE deckverse.rooms SET state=$1::jsonb WHERE code='ABC123' RETURNING code,jsonb_typeof(state) AS kind,state->>'status' AS phase",[game]);
+ assert.equal(seeded.length,1,"Legacy playing room must exist for seeded state");
+ assert.deepEqual({kind:seeded[0].kind,phase:seeded[0].phase},{kind:"object",phase:"playing"});
+ console.log("ROUND5_LEGACY_FIXTURE_GAME_SEEDED",seeded[0].code,seeded[0].kind,seeded[0].phase);
  await admin.unsafe("UPDATE deckverse.players SET token_hash=$1,last_seen_at=clock_timestamp() WHERE room_id=(SELECT id FROM deckverse.rooms WHERE code='ABC123') AND seat=0",[digest(token0)]);
  await admin.unsafe("UPDATE deckverse.players SET token_hash=$1,last_seen_at=clock_timestamp() WHERE room_id=(SELECT id FROM deckverse.rooms WHERE code='ABC123') AND seat=1",[digest(token1)]);
  const oldFields="SELECT md5((SELECT jsonb_agg(to_jsonb(r) ORDER BY r.id)::text FROM deckverse.rooms r) || (SELECT jsonb_agg(to_jsonb(p) ORDER BY p.room_id,p.seat)::text FROM deckverse.players p)) AS fingerprint";
