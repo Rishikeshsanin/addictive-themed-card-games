@@ -3,6 +3,7 @@ import {createHash,randomBytes,randomInt} from 'node:crypto';
 import {newGame,takeTurn,viewFor} from '../src/engine.js';
 import {DECKS} from '../src/catalog.js';
 import {revealState,revealDeadline,mayAdvance,validateRevealSettings} from '../src/reveal.js';
+import {decideRematch} from '../src/rematch.js';
 const dbUrl=process.env.DECKVERSE_DATABASE_URL;
 const sql=dbUrl?postgres(dbUrl,{ssl:'require',max:3,prepare:false,idle_timeout:15,connect_timeout:9}):null;
 const hash=val=>createHash('sha256').update(val).digest('hex');
@@ -75,14 +76,13 @@ async function action(db,b){
      await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
      await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',updated_at=now() where id=${room.id}`;
    }else if(b.action==='rematch'){
-     if(room.status!=='finished'||room.state?.status!=='finished')throw fail('A rematch can only begin after the match ends.',409);
-     if(room.state.endReason==='forfeit')throw fail('A player left the match. Create a new room.',409);
      const ps=await tx`select seat,ready from deckverse.players where room_id=${room.id} and active=true order by seat`;
-     if(ps.length!==2)throw fail('Both original players are needed for a rematch.',409);
+     const decision=decideRematch({status:room.status,state:room.state,players:ps,seat:me.index});
+     if(decision.error)throw fail(decision.error,409);
      if(!ps.find(p=>p.seat===me.index)?.ready){
        await tx`update deckverse.players set ready=true where room_id=${room.id} and seat=${me.index} and active=true`;
      }
-     if(ps.filter(p=>p.seat!==me.index).every(p=>p.ready)){
+     if(decision.restart){
        const state=newGame({ids:DECKS[2]});
        state.matchNumber=(room.state.matchNumber||1)+1;
        await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
