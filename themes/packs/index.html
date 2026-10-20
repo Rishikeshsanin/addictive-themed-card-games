@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0c1020"><meta name="description" content="DeckVerse themed card packs: private development preview.">
+<title>DeckVerse | Theme Lab</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./lab.css"></head>
+<body><div class="glow" aria-hidden="true"></div>
+<header class="top"><a href="/" class="logo">✦ DECK<span>VERSE</span></a><span class="slash">/</span><strong>THEME LAB</strong><span class="spacer"></span><span class="chip">PRIVATE DEVELOPMENT PREVIEW</span></header>
+<main>
+<section class="intro"><div><p class="eyebrow">ONE GAME. ENDLESS UNIVERSES.</p><h1>CHOOSE YOUR<br><em>UNIVERSE.</em></h1><p>Eight comparison categories. Nostalgic card battles. Seven new decks, each with 80 unique cards — built with two and three friends in mind.</p></div><div class="headline-icon" aria-hidden="true">✦<span>80</span></div></section>
+<section id="themes" class="section"><div class="section-title"><div><p class="eyebrow">01 / THE COLLECTION</p><h2>SELECT A THEME</h2></div><span id="roster-summary"></span></div>
+<div id="theme-grid" class="theme-grid"></div></section>
+<section class="section" id="collection"><div class="section-title"><div><p class="eyebrow">02 / KNOW YOUR CARDS</p><h2 id="collection-title">THE COLLECTION</h2><p id="collection-subtitle" class="subtle"></p></div><div class="count"><span id="count">80</span><small>CARDS</small></div></div>
+<div class="toolbar"><label class="search"><span class="sr-only">Search cards</span><input id="search" type="search" placeholder="Search cards, squads, powers..."></label><select id="group" aria-label="Filter by group"><option value="all">ALL GROUPS</option></select><select id="player-filter" aria-label="Deck size"><option value="2">2-PLAYER DECK · 50</option><option value="3">3-PLAYER DECK · 60</option><option value="4">4-PLAYER DECK · 80</option></select></div>
+<div id="cards" class="card-grid"></div><p id="empty" class="hidden subtle">No matching cards.</p></section>
+<section class="section" id="arena"><div class="section-title"><div><p class="eyebrow">03 / THE SHOWDOWN</p><h2>SOLO PRACTICE</h2><p class="subtle">Play against local AI opponents to preview 2-, 3- or 4-player card mechanics. Online rooms are not enabled here.</p></div></div>
+<div class="arena-controls"><label>PLAYERS <select id="players"><option value="2">2 PLAYERS (YOU + 1 BOT)</option><option value="3">3 PLAYERS (YOU + 2 BOTS)</option><option value="4">4 PLAYERS (YOU + 3 BOTS)</option></select></label><button id="start" class="cta">⚡ DEAL THE CARDS</button><button id="end" class="secondary hidden">EXIT MATCH</button></div>
+<div id="game" class="hidden">
+ <div id="scoreboard" class="scoreboard"></div><div id="game-status" class="game-status" role="status" aria-live="polite"></div>
+ <div id="battle" class="battle"></div><div id="reveal" class="reveal hidden" role="status" aria-live="polite"></div>
+ <div class="battle-control"><h3 id="prompt">PICK A CATEGORY</h3><p id="help" class="subtle">Your top card is the only card revealed before selecting a stat.</p><div id="actions" class="stat-actions"></div><p id="jackpot" class="pot-label">◇ NO JACKPOT CARDS</p></div>
+ </div></section>
+<div class="fineprint"><strong>DEVELOPMENT NOTICE</strong> — Franchise characters are unofficial placeholders. No licensed film art, actor likenesses, official logos, or real athlete photographs are included. Power ratings are editorial game values, not official facts. Publishing franchise packs requires rights review.</div>
+</main>
+<div id="details" class="drawer hidden" role="dialog" aria-modal="true" aria-labelledby="detail-name"><button id="backdrop" class="backdrop" aria-label="Close details"></button><div class="drawer-panel"><div class="drawer-head"><small>CARD PROFILE</small><button id="close" aria-label="Close card profile">✕</button></div><div id="detail-body"></div></div></div>
+<footer><strong>✦ DECKVERSE / THEME LAB</strong><span>ONE SHARED RULESET • INDEPENDENT DEVELOPMENT BRANCH</span><a href="/">BACK TO DECKVERSE ↗</a></footer>
+<script type="module" src="./lab.js"></script></body></html>
