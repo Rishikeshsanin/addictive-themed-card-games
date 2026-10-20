@@ -143,3 +143,7 @@ finally{
  await sql.end({timeout:5});
  await new Promise(resolve=>server.close(resolve));
 }
+
+// Final release stress lane runs against the same disposable SQL instance AFTER
+// the independent Chromium sessions and HTTP server have closed.
+if(!process.exitCode) await import('./db-multiplayer-final-release.mjs');
