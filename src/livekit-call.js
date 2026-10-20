@@ -180,7 +180,7 @@ export async function connectCall(getSession, showToast = () => {}) {
   if (!response.ok) {
    if (response.status === 429) throw Error('Call limit reached · try again shortly');
    if (response.status === 401 || response.status === 403) throw Error('Call session expired · rejoin the game room');
-   throw Error(typeof body.error === 'string' ? body.error : 'Calling service unavailable');
+   throw Error('Calling service temporarily unavailable · the game still works');
   }
   if (!body.url || !body.token) throw Error('Calling service returned an incomplete response');
   sdk ??= await import(SDK_URL);
@@ -210,7 +210,8 @@ export async function connectCall(getSession, showToast = () => {}) {
    room = pendingRoom = null;
    const message = error?.name === 'AbortError' ? 'Call request cancelled' :
     error instanceof TypeError ? 'Network or calling SDK unavailable · gameplay continues' :
-    (error?.message || 'Call unavailable · gameplay continues');
+    /^Call limit reached|^Call session expired|^Calling service/.test(error?.message || '') ? error.message :
+    'Call could not connect · please try again; the game still works';
    status(message); showToast(message);
   }
  } finally {
