@@ -1,0 +1,99 @@
+name: DeckVerse isolated DB + mobile integration QA
+
+on:
+  pull_request:
+    branches: [integration/deckverse-v2-api-wiring]
+    paths:
+      - "tests/db-integration-mobile-*.mjs"
+      - ".github/workflows/db-integration-mobile-check.yml"
+      - "docs/DB_INTEGRATION_MOBILE_QA.md"
+      - "api/game.js"
+      - "api/livekit-token.js"
+      - "src/**"
+      - "index.html"
+      - "styles.css"
+      - "migrations/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deckverse-mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-postgres-and-chromium:
+    name: Disposable PostgreSQL and synthetic mobile browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: deckverse_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_admin_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d deckverse_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DB_INTEGRATION_LOCAL_ONLY: "YES"
+      DB_INTEGRATION_ADMIN_URL: "postgres://postgres:ci_admin_only@127.0.0.1:5432/deckverse_ci"
+      DECKVERSE_DATABASE_URL: "postgres://deckverse_app:ci_disposable_app_only@127.0.0.1:5432/deckverse_ci"
+      CHROME_PATH: /usr/bin/google-chrome
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked project dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Enable TLS for isolated PostgreSQL (API requires SSL)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CID="$(docker ps --filter ancestor=postgres:16 --format '{{.ID}}' | head -n 1)"
+          test -n "$CID"
+          # Ephemeral self-signed localhost certificate; unrelated to production.
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1             -subj '/CN=localhost' -keyout /tmp/dv-ci-server.key             -out /tmp/dv-ci-server.crt >/dev/null 2>&1
+          docker cp /tmp/dv-ci-server.key "$CID:/var/lib/postgresql/data/server.key"
+          docker cp /tmp/dv-ci-server.crt "$CID:/var/lib/postgresql/data/server.crt"
+          docker exec -u root "$CID" chown postgres:postgres             /var/lib/postgresql/data/server.key /var/lib/postgresql/data/server.crt
+          docker exec -u root "$CID" chmod 600 /var/lib/postgresql/data/server.key
+          docker exec -u root "$CID" chmod 644 /var/lib/postgresql/data/server.crt
+          docker exec -u postgres "$CID" psql -U postgres -d deckverse_ci -v ON_ERROR_STOP=1             -c "ALTER SYSTEM SET ssl = 'on'"             -c "ALTER SYSTEM SET ssl_cert_file = '/var/lib/postgresql/data/server.crt'"             -c "ALTER SYSTEM SET ssl_key_file = '/var/lib/postgresql/data/server.key'"
+          docker exec -u root "$CID" bash -lc 'kill -HUP "$(head -n1 /var/lib/postgresql/data/postmaster.pid)"'
+          for i in {1..20}; do
+            if docker exec -u postgres "$CID" psql -U postgres -d deckverse_ci -tAc 'SHOW ssl' | grep -q '^on$'; then
+              echo "Disposable DB SSL enabled"; break
+            fi
+            sleep 1
+          done
+          test "$(docker exec -u postgres "$CID" psql -U postgres -d deckverse_ci -tAc 'SHOW ssl')" = "on"
+          rm -f /tmp/dv-ci-server.key /tmp/dv-ci-server.crt
+
+      - name: Build disposable DeckVerse schema and apply V2 migration fixtures
+        run: node tests/db-integration-mobile-setup.mjs
+
+      - name: Validate LiveKit lifecycle and denied-permission contract (mock SDK)
+        run: node --test tests/livekit-mobile-lifecycle.mjs
+
+      - name: Validate combined PostgreSQL + mobile browser room/API/voice integration
+        run: node tests/db-integration-mobile-e2e.mjs
+
+      - name: Publish synthetic QA screenshots and measured timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deckverse-disposable-mobile-qa
+          path: artifacts/db-integration-mobile/
+          if-no-files-found: warn
+          retention-days: 7
