@@ -76,6 +76,8 @@ test('Round 5: isolated PostgreSQL + real Chromium 8 themes x 2/3/4 players (fro
   await step('tests/db-integration-mobile-setup.mjs',env,{timeout:120000});
   await step('tests/round5-theme-browser-apply-007.mjs',env,{timeout:120000});
   await step('tests/round5-theme-browser-e2e.mjs',env,{timeout:425000});
+  // Independent six-case synthetic SDK lifecycle regression, no LiveKit Cloud.
+  await step('tests/livekit-mobile-lifecycle.mjs',env,{timeout:90000});
   assert.ok(true);
  }finally{
   if(started){try{run('docker',['rm','-f',container],{silent:true,timeout:30000});}catch(e){console.error('Disposable container cleanup error',e.message)}}
