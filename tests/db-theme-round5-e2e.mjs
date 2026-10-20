@@ -158,7 +158,7 @@ async function runOne(theme,n){
  s.status='playing';s.winner=null;s.last=null;
  s.revealPolicy={mode:'auto',seconds:2};
  assert.equal(validateServerThemeMatch(s,theme),true);
- await sql.unsafe("UPDATE deckverse.rooms SET state=$1::jsonb, reveal_until=NULL, reveal_acks='[]'::jsonb, reveal_mode='auto' WHERE code=$2",[JSON.stringify(s),room.code]);
+ await sql.unsafe("UPDATE deckverse.rooms SET state=$1::jsonb, reveal_until=NULL, reveal_acks='[]'::jsonb, reveal_mode='auto' WHERE code=$2",[s,room.code]);
  const won=await checked('select',{...auth(room,0),stat:'rank',expectedRound:s.round});
  assert.equal(won.room.status,'finished','Fixture-assisted game must finish through actual API');
  const final=await row(room.code);
