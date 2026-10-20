@@ -89,7 +89,7 @@ async function action(db,b){
        await tx`update deckverse.players set ready=true where room_id=${room.id} and seat=${me.index} and active=true`;
      }
      if(decision.restart){
-       const state=newGame({ids:DECKS[2]});
+       const state=newMatch(playerCountOf(room));
        state.matchNumber=(room.state.matchNumber||1)+1;
        await tx`update deckverse.players set ready=false where room_id=${room.id} and active=true`;
        await tx`update deckverse.rooms set state=${tx.json(state)},status='playing',reveal_until=null,reveal_acks='[]'::jsonb,updated_at=now() where id=${room.id}`;
@@ -98,9 +98,9 @@ async function action(db,b){
      if(room.status!=='playing'||!room.state)throw fail('Match is not active.');
      if(!Number.isInteger(b.expectedRound)||b.expectedRound!==room.state.round)throw fail('Round has already advanced. Please wait for synchronization.',409);
      const activePolicy=room.state.revealPolicy||{mode:room.reveal_mode,seconds:room.reveal_seconds};
-     const display=revealState({...activePolicy,until:room.reveal_until,acks:room.reveal_acks});
+     const display=revealState({...activePolicy,required:playerCountOf(room),until:room.reveal_until,acks:room.reveal_acks});
      if(!mayAdvance(display))throw fail('The previous card reveal is still in progress.',409);
-     const state=takeTurn(room.state,me.index,b.stat);
+     const state=playerCountOf(room)===2?takeTurn(room.state,me.index,b.stat):multiTurn(room.state,me.index,b.stat);
      state.revealPolicy={mode:room.reveal_mode,seconds:room.reveal_seconds};
      const until=revealDeadline(state.revealPolicy);
      await tx`update deckverse.rooms set state=${tx.json(state)},status=${state.status},reveal_until=${until},reveal_acks='[]'::jsonb,updated_at=now() where id=${room.id}`;
