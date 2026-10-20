@@ -1,7 +1,7 @@
 name: DeckVerse PostgreSQL 17.6 schema parity
 on:
   pull_request:
-    branches: [integration/deckverse-v2-release-hardening, integration/deckverse-v2-theme-preview-20261020]
+    branches: [integration/deckverse-v2-release-hardening, integration/deckverse-v2-theme-preview-20261020, integration/deckverse-round5-review-20261021]
     paths:
       - "migrations/004_multiplayer_rooms.sql"
       - "migrations/005_deckverse_rate_limits.sql"
