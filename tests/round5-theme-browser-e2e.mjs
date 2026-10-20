@@ -361,17 +361,16 @@ try{
   for(const n of [2,3,4])await scenario(theme,n,i);
  }
  assert.equal(events.filter(e=>e.name==='API browser matrix'&&e.status==='PASS').length,24);
- // Every requested franchise gets its actual UI smoke; 3P/4P covered in
- // representative real UI sessions, while API/SQL covers all 24 combinations.
+ // Full browser-click acceptance: eight server-owned themes at every 2/3/4
+ // player count, with all four responsive viewport sizes rotated across cases.
  for(let i=0;i<ALLOWED_THEME_IDS.length;i++)
-  await themedUiScenario(ALLOWED_THEME_IDS[i],2,[320,390,768,1366][i%4]);
- for(const t of ['avengers','fantasy'])for(const n of [3,4])
-  await themedUiScenario(t,n,n===3?390:768);
- assert.equal(events.filter(e=>e.name==='INTEGRATED THEMED UI'&&e.status==='PASS').length,12);
+  for(const n of [2,3,4])
+   await themedUiScenario(ALLOWED_THEME_IDS[i],n,[320,390,768,1366][(i+n-2)%4]);
+ assert.equal(events.filter(e=>e.name==='INTEGRATED THEMED UI'&&e.status==='PASS').length,24);
  const report={classification:'real localhost HTTP -> real game.js -> disposable PostgreSQL 16, independently managed Chromium',
-  frontendAgentC:'12 UI-driven cases executed on this combined branch',physicalDevices:'NOT TESTED',
+  frontendAgentC:'24 UI-driven cases executed on this combined branch',physicalDevices:'NOT TESTED',
   liveKitCloud:'NOT TESTED',matchCompletion:'synthetic terminal state for rematch',
   passedMatrix:24,totalMatrix:24,events,metrics,defects};
  await writeFile('/tmp/deckverse-round5-report.json',JSON.stringify(report,null,2));
- console.log('ROUND5_FINAL_API_MATRIX_PASS 24 API scenarios + 12 UI-driven cases across eight themes');
+ console.log('ROUND5_FINAL_API_MATRIX_PASS 24 API scenarios + 24 UI-driven cases across eight themes');
 }finally{await browser?.close();await new Promise(done=>server.close(done));await db.end();}
