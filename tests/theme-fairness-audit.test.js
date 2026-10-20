@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {THEME_PACKS,THEME_IDS,DECK_SIZE,HAND_SIZE} from '../themes/packs/index.js';
-import {AUDIT_SEED,rosterAudit,seedFor,rng32,runMatch,study,bestCategories,cardsCsv} from '../scripts/theme-fairness-audit.mjs';
+import {AUDIT_SEED,rosterAudit,seedFor,rng32,runMatch,study,bestCategories,cardsCsv,cardsMarkdown} from '../scripts/theme-fairness-audit.mjs';
 const packKeys=['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'];
 
 test('all seven thematic 80-card rosters use eight meaningful typed comparisons',()=>{
@@ -103,6 +103,9 @@ test('every 560-card editorial row is CSV-exportable with severity and per-theme
  assert.ok(csv.includes('MS Dhoni'));
  assert.ok(csv.includes('Alien X'));
  assert.ok(csv.includes('original_situation')===false); // csv writes provenance/group/role, not kind
+ const readable=cardsMarkdown(inventory);
+ assert.equal(readable.split('\n').filter(x=>/^\| \d+ \|/.test(x)).length,560,'Missing a row in Markdown card review');
+ assert.ok(readable.includes('MS Dhoni'));
  assert.ok(inventory.allCards.some(c=>c.flags.length>0));
 });
 test('reproducible seven-theme 2/3/4-seat seeded fairness and long-match controls',()=>{
