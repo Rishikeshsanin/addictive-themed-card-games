@@ -33,7 +33,7 @@ jobs:
       - name: Simulate 2000 complete classic matches
         run: npm run simulate
       - name: Simulate experimental three- and four-player matches
-        run: node scripts/multi-simulate.js 40
+        run: node scripts/multi-simulate.js 400
       - name: Start static server
         run: |
           python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/deckverse-http.log 2>&1 &
