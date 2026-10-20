@@ -43,7 +43,20 @@ function init(){
  $('reveal-setting').onchange=async e=>{if(!session||session.me.index!==0||!lobbySnapshot)return;const [chosen,seconds]=e.target.value.split('-');const ok=await roomAction('settings',{mode:chosen,seconds:Number(seconds)});if(!ok)e.target.value=lobbySnapshot.room.revealSettings.mode+'-'+lobbySnapshot.room.revealSettings.seconds;};
  $('start-match').onclick=()=>roomAction('start');
  $('lobby-back').onclick=exitGame;$('battle-exit').onclick=exitGame;
- $('call-join').onclick=joinCall;$('call-leave').onclick=leaveCall;$('call-mic').onclick=toggleMic;$('call-camera').onclick=toggleCamera;
+ initCallControls(()=>session,toast);
+ $('battle-settings-open').onclick=()=>{$('battle-settings-panel').classList.toggle('hidden')};
+ $('battle-settings-close').onclick=()=>{$('battle-settings-panel').classList.add('hidden')};
+ $('battle-reveal-setting').onchange=async event=>{
+  if(!session||session.me.index!==0||game?.status!=='playing')return;
+  const previous=lobbySnapshot?.room?.revealSettings;
+  const [setting,seconds]=event.target.value.split('-');
+  event.target.disabled=true;
+  $('battle-settings-status').textContent='Saving for the next round…';
+  const ok=await roomAction('settings',{mode:setting,seconds:Number(seconds)});
+  if(!ok){event.target.value=previous.mode+'-'+previous.seconds;$('battle-settings-status').textContent='Save failed. Please try again.'}
+  else{$('battle-settings-status').textContent='Saved! Applies from next round.';toast('REVEAL TIMING UPDATED')}
+  event.target.disabled=false;
+ };
  $('join-code').addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)});
  $('player-name').addEventListener('keydown',e=>{if(e.key==='Enter')$('create-room').click()});
  if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
