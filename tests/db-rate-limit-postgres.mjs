@@ -134,10 +134,11 @@ test('server actions, wrong-code guessing and failed sessions use durable polici
  await rejected(()=>enforceRateLimit(app,ip2,{route:'game',action:'join',code:'ABCDEF'},fixed),'join-code-5m');
  await enforceRateLimit(app,ip2,{route:'game',action:'join',code:'FEDCBA'},fixed);
  const ip3=ip('198.51.100.32');
- await allowed(async()=>{
-    await enforceRateLimit(app,ip3,{route:'game',action:'join',code:'AAAAAA'},fixed);
+ for(let i=0;i<12;i++){
+    const guessedCode=String(i).padStart(6,'0');
+    await enforceRateLimit(app,ip3,{route:'game',action:'join',code:guessedCode},fixed);
     await recordRateLimitFailure(app,ip3,{kind:'invalid-code'},{vercel:false});
- },12);
+ }
  await assert.rejects(async()=>{
   await enforceRateLimit(app,ip3,{route:'game',action:'join',code:'BBBBBB'},fixed);
   await recordRateLimitFailure(app,ip3,{kind:'invalid-code'},{vercel:false});
