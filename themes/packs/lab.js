@@ -100,4 +100,5 @@ $('player-filter').onchange=e=>{state.deckSize=Number(e.target.value);showCards(
 $('players').onchange=e=>{if(state.game)end();$('player-filter').value=e.target.value;state.deckSize=Number(e.target.value);showCards()};
 $('start').onclick=start;$('end').onclick=end;$('close').onclick=closeDetails;$('backdrop').onclick=closeDetails;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('details').classList.contains('hidden'))closeDetails()});
-choose('avengers');$('player-filter').value='2';state.deckSize=2;showCards();
+const requestedTheme=new URLSearchParams(location.search).get('theme');
+choose(getTheme(requestedTheme)?requestedTheme:'avengers');$('player-filter').value='2';state.deckSize=2;showCards();
