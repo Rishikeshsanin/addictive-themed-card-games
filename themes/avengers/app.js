@@ -72,7 +72,7 @@ function botChoice(){
  const top=card(game.players[1].deck[0]);
  const candidates=STAT_FIELDS.map(s=>{
   const value=top[s.key];
-  const scores=CHARACTERS.reduce((sum,other)=>sum+(s.direction==='min'?value<other[s.key]:value>other[s.key])?1:0,0);
+  const scores=CHARACTERS.reduce((sum,other)=>sum+((s.direction==='min'?value<other[s.key]:value>other[s.key])?1:0),0);
   const ties=CHARACTERS.reduce((sum,other)=>sum+(value===other[s.key]?1:0),0);
   return {key:s.key,score:scores+ties*0.5};
  }).sort((a,b)=>b.score-a.score);
