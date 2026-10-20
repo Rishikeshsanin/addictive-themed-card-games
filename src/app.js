@@ -278,7 +278,7 @@ function renderBattle(){
  $('stat-buttons').querySelectorAll('[data-stat]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.stat)));
  $('pot-info').textContent=game.pot?'◇ '+game.pot+' CARDS IN THE TIE JACKPOT':'◇ NO CARDS IN THE JACKPOT';
  $('call-dock').classList.toggle('hidden',!session||session.mode!=='remote');
- const host=Boolean(session&&session.me.index===0);
+ const host=Boolean(session&&session.me.index===(lobbySnapshot?.room?.hostSeat??0));
  $('battle-settings-open').classList.toggle('hidden',!host||ended);
  if(!host||ended)$('battle-settings-panel').classList.add('hidden');
  const settings=lobbySnapshot?.room?.revealSettings||{mode:'auto',seconds:2};
