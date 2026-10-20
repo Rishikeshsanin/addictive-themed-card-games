@@ -7,6 +7,9 @@ on:
       - 'docs/V2_CI_PARITY_REVIEW.md'
       - 'tests/db-multiplayer-*.mjs'
       - 'migrations/004_multiplayer_rooms.sql'
+      - 'migrations/005_deckverse_rate_limits.sql'
+      - 'migrations/006_deckverse_presence.sql'
+      - 'migrations/007_theme_rooms.sql'
       - 'api/game.js'
       - 'src/**'
   workflow_dispatch:
@@ -91,6 +94,7 @@ jobs:
           sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/004_multiplayer_rooms.sql
           sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/005_deckverse_rate_limits.sql
           sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/006_deckverse_presence.sql
+          sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci -f migrations/007_theme_rooms.sql
           sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d deckverse_ci <<'SQL'
           -- Restricted fictional test roles; no real Hub resource or global secrets.
           GRANT CONNECT ON DATABASE deckverse_ci TO deckverse_app, deckverse_ci_fixture;
@@ -106,7 +110,7 @@ jobs:
           SQL
           psql "$DECKVERSE_DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atc "SELECT current_user || ':' || (SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()) || ':' || (SELECT COUNT(*) FROM deckverse.rooms WHERE code='LEGACY');" | grep -Fx 'deckverse_app:true:1'
           psql "$DB_MULTIPLAYER_FIXTURE_URL" -X -v ON_ERROR_STOP=1 -Atc "SELECT COUNT(*) FROM deckverse.players WHERE seat=0;" | grep -Fx '1'
-          echo 'Disposable SSL PostgreSQL and legacy -> 004/005/006 fixture migration verified.'
+          echo 'Disposable SSL PostgreSQL and legacy -> 004/005/006/007 fixture migration verified.'
       - name: Database-backed API game and transaction tests
         run: node tests/db-multiplayer-api.mjs
       - name: Real PostgreSQL-backed mobile browser sessions
