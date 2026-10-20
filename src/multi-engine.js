@@ -22,7 +22,7 @@ export function startMultiGame({playerCount,ids=DECKS[playerCount],picker=secure
 export function validateMulti(s){
  assert(s&&supportedPlayers.includes(s.playerCount),'Invalid player count');
  assert(s.total===s.playerCount*20,'Invalid configured deck total');
- assert(s.status==='playing'||s.status==='finished','Invalid match status');
+ assert(['playing','finished','aborted'].includes(s.status),'Invalid match status');
  assert(Number.isSafeInteger(s.round)&&s.round>=0,'Invalid round counter');
  assert(s.players?.length===s.playerCount,'Wrong roster length');
  assert(s.players.every(p=>Array.isArray(p.deck))&&Array.isArray(s.pot),'Missing decks');
