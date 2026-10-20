@@ -37,19 +37,35 @@ function mockPostgres(clock=()=>Date.now()) {
 const req=(ip='203.0.113.9',headers={})=>({socket:{remoteAddress:ip},headers});
 const noCleanup={vercel:false,cleanupChance:0};
 
-test('Vercel proxy IP is trusted only on Vercel, not ordinary forwarded headers',()=>{
- const r=req('127.0.0.1',{'x-forwarded-for':'8.8.8.8','x-vercel-forwarded-for':'2001:db8::1'});
+test('Vercel IP comes only from its overwritten x-forwarded-for header',()=>{
+ const r=req('127.0.0.1',{'x-forwarded-for':'2001:db8::1','x-vercel-forwarded-for':'8.8.8.8'});
  assert.equal(getClientIP(r,{vercel:false}),'127.0.0.1');
  assert.equal(getClientIP(r,{vercel:true}),'2001:db8::1');
- assert.equal(getClientIP({...r,headers:{'x-forwarded-for':'8.8.8.8'}},{vercel:true}),null);
- assert.equal(getClientIP(req('127.0.0.1',{'x-vercel-forwarded-for':'8.8.8.8, 1.2.3.4'}),{vercel:true}),null);
+ assert.equal(getClientIP({...r,headers:{'x-vercel-forwarded-for':'8.8.8.8'}},{vercel:true}),null);
+ assert.equal(getClientIP(req('127.0.0.1',{'x-forwarded-for':'8.8.8.8, 1.2.3.4'}),{vercel:true}),null);
+ assert.equal(getClientIP(req('127.0.0.1',{'x-forwarded-for':'192.0.2.4','x-real-ip':'8.8.8.8','forwarded':'for=8.8.8.8'}),{vercel:true}),'192.0.2.4');
 });
 
-test('malformed/missing identity is not trusted',()=>{
+test('malformed/missing or duplicated identity is not trusted',()=>{
  assert.equal(getClientIP(req('evil-address'),{vercel:false}),null);
- assert.equal(getClientIP(req(undefined,{'x-vercel-forwarded-for':['1.2.3.4']}),{vercel:true}),null);
+ assert.equal(getClientIP(req(undefined,{'x-forwarded-for':['1.2.3.4']}),{vercel:true}),null);
  assert.equal(getClientIP(req('1.2.3.4%eth0'),{vercel:false}),null);
+ const dup={...req('127.0.0.1',{'x-forwarded-for':'192.0.2.4'}),rawHeaders:['X-Forwarded-For','192.0.2.4','x-forwarded-for','8.8.8.8']};
+ assert.equal(getClientIP(dup,{vercel:true}),null);
+ assert.equal(getClientIP({...dup,rawHeaders:['X-Forwarded-For','192.0.2.4']},{vercel:true}),'192.0.2.4');
 });
+
+test('IPv6 aliases and IPv4-mapped IPv6 share the same quota identity',async()=>{
+ const make=(ip,vercel=false)=>getClientIP(req(ip,{'x-forwarded-for':ip}),{vercel});
+ assert.equal(make('2001:0DB8:0000:0:0::0001'),'2001:db8::1');
+ assert.equal(make('2001:db8::1',true),'2001:db8::1');
+ assert.equal(make('::ffff:192.0.2.7'),'192.0.2.7');
+ assert.equal(make('0:0:0:0:0:ffff:c000:207',true),'192.0.2.7');
+ const db=mockPostgres(()=>1000);
+ for(let i=0;i<8;i++)await enforceRateLimit(db.sql,req('2001:db8::1'),{route:'game',action:'create'},noCleanup);
+ await assert.rejects(()=>enforceRateLimit(db.sql,req('2001:0DB8:0000:0:0::1'),{route:'game',action:'create'},noCleanup),RateLimitError);
+});
+
 
 test('fixed-window threshold returns 429 with bounded retry',async()=>{
  let time=1000;const db=mockPostgres(()=>time);

@@ -5,7 +5,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import postgres from 'postgres';
-import {evaluateRoomPresence, presenceOf} from '../src/presence.js';
+import {evaluateRoomPresence, presenceOf, retentionSeconds} from '../src/presence.js';
+import {sweepExpiredRoomSessions} from '../api/game.js';
 
 const ADMIN=process.env.PRESENCE_TEST_ADMIN_URL;
 const APP=process.env.DECKVERSE_DATABASE_URL;
@@ -340,17 +341,110 @@ test('simultaneous heartbeat and intentional leave cannot resurrect a departed s
   assert.ok(committed.players[0].left_at instanceof Date);
   await rejected('heartbeat',as(r.users[0]),401);
 });
-test('three-hour sliding expiry contradicts 24-hour playing abandonment horizon',async()=>{
-  const r=await room();
+test('active recovery TTL lasts 24 hours, fixing previous three-hour mismatch',async()=>{
+  for(const n of [2,3,4]){
+    const r=await room(n);
+    await readyAndStart(r.users);
+    const before=await details(r.code);
+    const delta=before.r.expires_at.getTime()-Date.now();
+    assert.ok(delta>23.9*3600000&&delta<=24*3600000+5000, `playing ${n}P TTL: ${delta}`);
+    const total=before.r.state.players.reduce((a,p)=>a+p.deck.length,0)+before.r.state.pot.length;
+    assert.equal(total,n===2?50:n*20);
+    // Simulate four hours without heartbeats, but still inside the 24h lease.
+    for(const user of r.users)await stale(r.code,user.index,4*3600);
+    const v=await ok('get',as(r.users[0]));
+    assert.equal(v.room.paused,true);
+    assert.equal(v.game.round,0);
+    assert.equal((await details(r.code)).r.state.players.reduce((a,p)=>a+p.deck.length,0),total);
+    const heartbeat=await ok('heartbeat',as(r.users[0]));
+    assert.equal(heartbeat.me.index,0);
+    assert.ok((await details(r.code)).r.expires_at.getTime()>Date.now()+23.9*3600000);
+  }
+});
+test('retention phases: lobby 30m, playing 24h, finished 30m and old token rejected',async()=>{
+  assert.deepEqual(['lobby','playing','finished'].map(retentionSeconds),[1800,86400,1800]);
+  assert.throws(()=>retentionSeconds('aborted'));
+  const r=await room(2);
+  const lobby=await details(r.code);
+  assert.ok(lobby.r.expires_at.getTime()<Date.now()+31*60000);
+  assert.ok(lobby.r.expires_at.getTime()>Date.now()+29*60000);
   await readyAndStart(r.users);
-  await ok('heartbeat',as(r.users[0]));
-  const state=await details(r.code);
-  const inFourHours=Date.now()+4*60*60_000;
-  const preservedPolicy=evaluateRoomPresence({
-    players:state.players,playerCount:2,hostSeat:0,status:'playing',now:inFourHours
-  });
-  assert.equal(preservedPolicy.abandoned,false); // intended policy still preserves cards
-  assert.ok(state.r.expires_at.getTime()<inFourHours); // API would reject before 24h
+  const playing=await details(r.code);
+  assert.ok(playing.r.expires_at.getTime()>Date.now()+23*3600000);
+  const before=playing.r.state;
+  await ok('leave',as(r.users[0]));
+  const ended=await details(r.code);
+  assert.equal(ended.r.status,'finished');
+  assert.equal(ended.r.state.endReason,'forfeit');
+  assert.ok(ended.r.expires_at.getTime()<Date.now()+31*60000);
+  assert.deepEqual(ended.r.state.players,before.players);
+  await rejected('get',as(r.users[0]),401);
+  assert.equal((await ok('get',as(r.users[1]))).room.status,'finished');
+});
+test('soft expiration is bounded, transactional and preserves historical cards and hashes',async()=>{
+  const r=await room(3);
+  await readyAndStart(r.users);
+  const before=await details(r.code);
+  await db`update deckverse.rooms set expires_at=clock_timestamp()-interval '1 second' where code=${r.code}`;
+  await rejected('get',as(r.users[0]),404);
+  await rejected('heartbeat',as(r.users[1]),404);
+  const count=await sweepExpiredRoomSessions(app,{batch:32});
+  assert.ok(count>=3, `expired seats revoked: ${count}`);
+  const after=await details(r.code);
+  assert.equal(after.r.status,'playing'); // historical outcome not falsified
+  assert.deepEqual(after.r.state,before.r.state);
+  assert.deepEqual(after.players.map(p=>p.token_hash),before.players.map(p=>p.token_hash));
+  assert.ok(after.players.every(p=>p.active===false&&p.ready===false&&p.left_at===null));
+  assert.equal(await sweepExpiredRoomSessions(app,{batch:32}),0);
+  await assert.rejects(()=>sweepExpiredRoomSessions(app,{batch:0}),/batch/);
+});
+test('cleanup skips locked rooms and does not expire an actively refreshing match',async()=>{
+  const r=await room(2);
+  await readyAndStart(r.users);
+  const before=await details(r.code);
+  await Promise.all([ok('heartbeat',as(r.users[0])),sweepExpiredRoomSessions(app,{batch:8})]);
+  const after=await details(r.code);
+  assert.deepEqual(after.r.state,before.r.state);
+  assert.ok(after.players.every(p=>p.active));
+  assert.ok(after.r.expires_at.getTime()>Date.now()+23.9*3600000);
+});
+test('single-snapshot GETs remain coherent during 2/3/4 host races and never disclose secrets',async()=>{
+  for(const n of [2,3,4]){
+    const r=await room(n);
+    const before=await details(r.code);
+    await stale(r.code,0,121);
+    const outputs=await Promise.all([
+      ...r.users.slice(1).map(user=>request('heartbeat',as(user))),
+      ...r.users.map(user=>request('get',as(user)))
+    ]);
+    assert.ok(outputs.every(x=>x.status===200), JSON.stringify(outputs.filter(x=>x.status!==200)));
+    const shaHashes=before.players.map(p=>p.token_hash);
+    for(const output of outputs){
+      assert.equal(output.body.players.length,n);
+      assert.equal(new Set(output.body.players.map(p=>p.index)).size,n);
+      assert.ok(output.body.players.some(p=>p.index===output.body.room.hostSeat));
+      const serialized=JSON.stringify(output.body);
+      for(const digest of shaHashes)assert.ok(!serialized.includes(digest),'token hash leaked');
+      for(const user of r.users)assert.ok(!serialized.includes(user.token),'session token leaked');
+      assert.ok(!serialized.includes('"deck":'),'future hidden decks leaked');
+    }
+    const final=await details(r.code);
+    assert.equal(final.r.host_seat,1);
+    assert.equal(Number(final.r.presence_version),1);
+  }
+});
+test('expired lobby cleanup retains participants historical rows; no infinite access',async()=>{
+  const r=await room(2);
+  const before=await details(r.code);
+  await db`update deckverse.rooms set expires_at=clock_timestamp()-interval '2 seconds' where code=${r.code}`;
+  await rejected('get',as(r.users[1]),404);
+  await sweepExpiredRoomSessions(app,{batch:32});
+  const after=await details(r.code);
+  assert.equal(after.r.status,'lobby');
+  assert.equal(after.players.length,2);
+  assert.deepEqual(after.players.map(p=>p.token_hash),before.players.map(p=>p.token_hash));
+  assert.ok(after.players.every(p=>!p.active));
+  await rejected('heartbeat',as(r.users[1]),404);
 });
 test.after(async()=>{
   await app.end({timeout:2});
