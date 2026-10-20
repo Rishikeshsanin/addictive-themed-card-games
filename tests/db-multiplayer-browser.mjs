@@ -73,7 +73,7 @@ try{
    }
    await pages[0].waitForFunction(n=>document.querySelectorAll('#lobby-players .player-slot small')
     .length===n&&[...document.querySelectorAll('#lobby-players .player-slot small')]
-    .every(e=>e.textContent.includes('READY')),n,{timeout:12000});
+    .every(e=>e.textContent.includes('● READY')),n,{timeout:12000});
    await pages[0].locator('#start-match').click();
    for(let i=0;i<n;i++){
     await pages[i].locator('#stat-buttons .stat-button').first().waitFor({timeout:12000});
