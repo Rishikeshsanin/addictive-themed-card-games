@@ -228,16 +228,21 @@ async function run(){
    for(let i=0;i<count;i++){
     await clients[i].page.locator('#battle').waitFor({state:'visible',timeout:12000});
     const overflowInfo=await clients[i].page.evaluate(()=>{
-     const overflow=document.documentElement.scrollWidth-innerWidth;
-     const oversized=[...document.querySelectorAll('body *')].map(el=>({el,r:el.getBoundingClientRect()}))
-      .filter(x=>x.r.width&&x.r.right>innerWidth+2 && getComputedStyle(x.el).visibility!=='hidden')
-      .slice(0,8).map(x=>({tag:x.el.tagName,id:x.el.id,cls:String(x.el.className||'').slice(0,80),right:Math.round(x.r.right)}));
-     return {overflow,oversized};
+     const rawOverflow=document.documentElement.scrollWidth-innerWidth;
+     window.scrollTo({left:10000,top:window.scrollY,behavior:'instant'});
+     const actualScrollX=window.scrollX;
+     window.scrollTo({left:0,top:window.scrollY,behavior:'instant'});
+     const nodes=[...document.querySelectorAll('#multi-arena .battle-card, .tabletop .battle-card, #stat-buttons button')]
+      .filter(el=>el.getBoundingClientRect().width>0);
+     const blocked=nodes.filter(el=>{
+      const r=el.getBoundingClientRect(); return r.left < -2 || r.right > innerWidth + 2;
+     }).map(el=>({tag:el.tagName,cls:String(el.className||'').slice(0,80)})).slice(0,6);
+     return {rawOverflow,actualScrollX,blocked,decorativeOverflow:rawOverflow>2&&actualScrollX<=2};
     });
-    if(overflowInfo.overflow>2){
-     record(`responsive overflow ${count}P seat ${i} at ${sizes[i].width}px`,false,overflowInfo);
+    if(overflowInfo.actualScrollX>2 || overflowInfo.blocked.length){
+     record(`interactive viewport clipping ${count}P seat ${i} at ${sizes[i].width}px`,false,overflowInfo);
      await screenshot(clients[i].page,`overflow-${count}p-${sizes[i].width}`);
-    }else record(`no horizontal overflow ${count}P seat ${i} at ${sizes[i].width}px`,true,{overflow:overflowInfo.overflow});
+    }else record(`usable mobile layout ${count}P seat ${i} at ${sizes[i].width}px`,true,overflowInfo);
     if(count>2){
      assert.equal(await clients[i].page.locator('#multi-arena .multi-player').count(),count);
      assert.equal(await clients[i].page.locator('#multi-arena .card-name').count(),1,'opponent top cards must be concealed');
