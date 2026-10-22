@@ -1,7 +1,7 @@
 # DeckVerse Theme Packs — isolated prototype
 
 ## Current status
-**Experimental development only.** These seven theme packs live under `themes/packs/`, and are intentionally isolated from deployed Pokémon and DeckVerse V2 backend code. Their URL when this branch is hosted by a static server is `/themes/packs/`. Do not infer a public Vercel preview deployment.
+**Experimental development only.** These twelve theme packs live under `themes/packs/`, and are intentionally isolated from deployed Pokémon and DeckVerse V2 backend code. Their URL when this branch is hosted by a static server is `/themes/packs/`. Do not infer a public Vercel preview deployment.
 
 | Theme | Unique inventory | Deck modes | Theme-specific comparisons |
 | --- | ---: | --- | --- |
@@ -16,7 +16,7 @@
 **Important:** The 2-player deck is 50 cards (25 each). The 3-player deck is 60 cards (20 each). The 4-player deck is 80 cards (20 each). Roster manifests are deterministic. Actual deals are securely shuffled. These modes are **solo practice against non-omniscient bots**, NOT multiplayer rooms. The existing Pokémon game stays exactly as it was in the branch baseline.
 
 ## What makes the categories meaningful?
-- Every pack has exactly eight documented categories. Rank has *lower wins* semantics; the other seven are *higher wins*.
+- Every pack has exactly eight documented categories. Rank has *lower wins* semantics; the other twelve are *higher wins*.
 - Popular or recognizably extreme character strengths have explicitly reviewed **example editorial** scores (e.g., Grey Matter intellect, XLR8 speed, Hulk strength, Batman intellect, Rock Lee taijutsu). Avengers' first 50 hand-edited profiles from the prior prototype are reused where names match.
 - Remaining ratings are deterministic, scenario-tuned **draft game design values**, calculated from broad roles with explicit strengths/weaknesses to keep the prototype internally consistent. These **are not official factual measurements**, and still require character-by-character editorial review, fairness simulations, and licensing before release.
 - Cricket numerical values are neither official career batting averages/wickets nor guaranteed lifetime rankings. All roles and names need editorial review, including player availability and name spelling.
@@ -46,10 +46,22 @@ Browser test requires installed Chrome; set `CHROME_PATH` as needed.
 Marvel/Avengers, Ben 10, DC, Naruto and Shin-chan characters and universes have third-party copyrights/trademarks; athlete names and likenesses also carry publicity and licensing considerations. This prototype embeds **no official character photography or logos**, uses only symbols/color motifs, and does not prove permission to publicly distribute character-branded content. Obtain permission or switch to entirely original packs before unrestricted commercial use.
 
 ## Acceptance
-- 7 × 80 unique card identities per pack; 50/60/80 valid manifests
+- 12 × 80 unique card identities across the twelve local packs; 50/60/80 valid manifests
 - exactly 8 theme-specific stats, rank as only low-wins
 - secure shuffle, hidden bot deck pre-reveal, strict card conservation, tie/jackpot/sudden death
 - real Chrome mobile 320 / 390 and tablet 768 / desktop viewport test
 - no changes to `api/game.js`, Supabase, Vercel, LiveKit, production Pokémon game, or other projects
 
 **NOT verified:** licensed imagery, physical devices, true multiplayer rooms, production load, canonical character-to-character fairness, actual cricket performance figures. Keep PR draft.
+
+## Wave 2 — Five more solo packs (October 2026)
+
+- `dragonball` — Dragon Ball Power Clash (Saiyans, Z Fighters, gods, classic rivals).
+- `onepiece` — One Piece Grand Line Clash (pirates, Navy, Revolutionaries and foes).
+- `wwe` — WWE Wrestling Icons (classic and modern wrestling legends).
+- `football` — Football Legends (men's and women's stars, historical and contemporary).
+- `wizarding` — Wizarding Duels (Hogwarts, Order, Dark Arts, magical-world figures).
+
+Each has 80 explicitly named collectible cards, exactly eight stat axes (Rank is lower-wins), 50/60/80-card deck manifests and local two-, three-, four-player bot matches. Ratings are editorial gameplay decisions, **not official franchise statistics or objective sporting measures**. No trademark logos, character likeness images, league badges or actor photographs are added for these new packs.
+
+Solo practice only. The original Pokémon online multiplayer remains unchanged. New themes do not get online rooms until a separately approved database migration and additional API work. No release rights for third-party franchises or player likenesses are asserted.

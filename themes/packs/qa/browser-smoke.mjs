@@ -1,16 +1,17 @@
 import {chromium} from 'playwright-core';
 import assert from 'node:assert/strict';
+import {THEME_IDS} from '../index.js';
 const chromiumExecutable=process.env.CHROME_PATH||'/usr/bin/google-chrome';
 const browser=await chromium.launch({headless:true,executablePath:chromiumExecutable,args:['--no-sandbox','--use-fake-ui-for-media-stream']});
 const address='http://127.0.0.1:4173/themes/packs/?qa-first=0';
-const ids=['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'];
+const ids=THEME_IDS;
 try{
  for(const [width,height] of [[320,640],[390,844],[768,1024],[1366,900]]){
    const page=await browser.newPage({viewport:{width,height}});
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto(address,{waitUntil:'domcontentloaded'});
    await page.locator('.theme-tile').first().waitFor();
-   assert.equal(await page.locator('.theme-tile').count(),7);
+   assert.equal(await page.locator('.theme-tile').count(),12);
    for(const id of ids){
      await page.locator('.theme-tile[data-theme="'+id+'"]').click();
      assert.equal(await page.locator('.collection-card').count(),50,id+' initial 2-player deck');
