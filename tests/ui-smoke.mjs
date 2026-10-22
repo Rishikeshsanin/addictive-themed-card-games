@@ -30,6 +30,7 @@ try {
  await page.setViewportSize({width:390,height:844});
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
  assert.equal(await page.locator('.theme-card').count(),8);
+ for(const id of ["avengers","ben10","shinchan","dc","naruto","cricket","fantasy"])assert.equal(await page.locator('[data-pack-theme="'+id+'"] .release-poster-image').getAttribute('src'),'/assets/theme-posters/'+id+'.webp');
  for(const id of ['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id);
  // A real themed practice turn, not a dead-end promotional tile.
  await page.locator('[data-pack-theme="avengers"]').click();
