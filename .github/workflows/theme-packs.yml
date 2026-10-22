@@ -1,0 +1,46 @@
+name: DeckVerse Theme Packs QA
+on:
+  pull_request:
+    paths:
+      - "themes/packs/**"
+      - "tests/theme-packs.test.js"
+      - ".github/workflows/theme-packs.yml"
+      - "tests/theme-balance-round5.test.js"
+      - "docs/V2_CI_PARITY_REVIEW.md"
+  workflow_dispatch:
+jobs:
+  theme-pack-rules-and-browser:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Check theme JS syntax
+        run: |
+          node --check themes/packs/rosters.js
+          node --check themes/packs/avengers-curated.js
+          node --check themes/packs/index.js
+          node --check themes/packs/engine.js
+          node --check themes/packs/lab.js
+      - name: Theme rules, 80-card inventory and turn invariant tests
+        run: node --test tests/theme-packs.test.js
+      - name: Serve isolated preview
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 > /tmp/deckverse-theme-server.log 2>&1 &
+          sleep 2
+      - name: Chrome actual 320px, 390px, 768px and desktop smoke
+        run: node themes/packs/qa/browser-smoke.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - name: Browser screenshots for design review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: theme-packs-chrome-preview
+          path: /tmp/deckverse-theme-lab-*.png
+          if-no-files-found: ignore
