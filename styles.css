@@ -109,3 +109,19 @@ html,body,#app{max-width:100%;overflow-x:clip}
 @media(max-width:1100px){.release-theme-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.release-theme-grid>.pokemon-theme{grid-column:span 2}}
 @media(max-width:740px){.release-theme-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.release-theme-grid>.pokemon-theme{grid-column:span 2;min-height:330px}.release-theme-grid>.release-pack-card{min-height:274px;padding:15px}.release-theme-grid .release-pack-card .theme-content{left:15px;right:13px;bottom:16px}.release-theme-grid .release-pack-card .theme-content h3{font-size:17px}.release-theme-grid .release-pack-card .theme-tags i{font-size:7px}.release-theme-grid .release-pack-card .theme-top{left:15px;right:15px;top:15px}}
 @media(max-width:370px){.release-theme-grid>.release-pack-card{min-height:290px}.release-theme-grid .release-pack-card .theme-content h3{font-size:15px}.release-theme-grid .release-pack-card .theme-tags i:nth-child(3){display:none}}
+
+/* Full-bleed theme fan-art posters. The native title/badges remain accessible and readable. */
+.release-theme-grid .release-pack-card{background:#111322;position:relative;isolation:isolate;overflow:hidden}
+.release-theme-grid .release-pack-card::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(to bottom,rgba(4,6,18,.66) 0%,rgba(4,6,18,.02) 24%,rgba(4,6,18,.08) 41%,rgba(4,6,18,.77) 76%,rgba(4,6,18,.94) 100%);transition:background .25s}
+.release-theme-grid .release-pack-card .release-poster-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 38%;filter:saturate(1.05) contrast(1.07);z-index:0;transition:transform .35s ease,filter .35s ease}
+.release-theme-grid .release-pack-card:hover .release-poster-image,.release-theme-grid .release-pack-card:focus-visible .release-poster-image{transform:scale(1.045);filter:saturate(1.15) contrast(1.08)}
+.release-theme-grid .release-pack-card .release-pack-emblem{z-index:0;opacity:.28}
+.release-theme-grid .release-pack-card .theme-top,.release-theme-grid .release-pack-card .theme-content{z-index:2;position:absolute}
+.release-theme-grid .release-pack-card .theme-content{text-shadow:0 2px 8px rgba(0,0,0,.9),0 4px 24px rgba(0,0,0,.9)}
+.release-theme-grid .release-pack-card .theme-content h3{font-size:clamp(17px,1.38vw,23px);line-height:1.12}
+.release-theme-grid .release-pack-card .theme-content p{color:#f0edf8;line-height:1.42}
+.release-theme-grid .release-pack-card .theme-tags i{background:rgba(11,12,25,.7);border:1px solid rgba(255,255,255,.18)}
+.release-theme-grid .release-pack-card .theme-live{background:rgba(9,13,23,.68);backdrop-filter:blur(7px);border-color:rgba(202,255,88,.65)}
+.release-theme-grid .release-pack-card .theme-arrow{filter:drop-shadow(0 2px 6px #05050d)}
+@media(max-width:740px){.release-theme-grid .release-pack-card .theme-content h3{font-size:17px}.release-theme-grid .release-pack-card .release-poster-image{object-position:center 33%}}
+@media(prefers-reduced-motion:reduce){.release-theme-grid .release-pack-card .release-poster-image{transition:none}}
