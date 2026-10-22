@@ -23,6 +23,8 @@ jobs:
       - name: Check theme JS syntax
         run: |
           node --check themes/packs/rosters.js
+          node --check themes/packs/bonus-rosters.js
+          node --check themes/packs/bonus-ratings.js
           node --check themes/packs/avengers-curated.js
           node --check themes/packs/index.js
           node --check themes/packs/engine.js

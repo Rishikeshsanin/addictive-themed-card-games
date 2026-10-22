@@ -125,3 +125,17 @@ html,body,#app{max-width:100%;overflow-x:clip}
 .release-theme-grid .release-pack-card .theme-arrow{filter:drop-shadow(0 2px 6px #05050d)}
 @media(max-width:740px){.release-theme-grid .release-pack-card .theme-content h3{font-size:17px}.release-theme-grid .release-pack-card .release-poster-image{object-position:center 33%}}
 @media(prefers-reduced-motion:reduce){.release-theme-grid .release-pack-card .release-poster-image{transition:none}}
+
+/* Wave 2: five bespoke CSS-only universe treatments — no licensed character art. */
+.release-theme-grid .release-wave2{background:
+  radial-gradient(ellipse at 55% 34%,color-mix(in srgb,var(--pack-color) 60%,transparent),transparent 58%),
+  radial-gradient(ellipse at 15% 9%,color-mix(in srgb,var(--pack-color) 24%,transparent),transparent 55%),
+  linear-gradient(135deg,#20233a,#111222 83%);
+  border-color:color-mix(in srgb,var(--pack-color) 38%,#363343);
+}
+.release-theme-grid .release-wave2:after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.7;background:repeating-conic-gradient(from 32deg at 52% 38%,transparent 0deg 27deg,rgba(255,255,255,.035) 29deg 31deg,transparent 33deg 60deg)}
+.release-theme-grid .release-wave2 .wave2-emblem{font-size:clamp(100px,10vw,180px);opacity:.8;transform:rotate(-12deg);filter:drop-shadow(0 4px 25px color-mix(in srgb,var(--pack-color) 65%,transparent));inset:40px 0 90px}
+.release-theme-grid .release-wave2:hover .wave2-emblem{transform:rotate(-6deg) scale(1.045)}
+.release-theme-grid .release-wave2 .theme-content{background:linear-gradient(0deg,rgba(5,7,20,.85),transparent);padding-top:22px}
+@media(max-width:740px){.release-theme-grid .release-wave2 .wave2-emblem{font-size:clamp(64px,20vw,130px)}}
+@media(prefers-reduced-motion:reduce){.release-theme-grid .release-wave2 .wave2-emblem{transition:none}}

@@ -29,7 +29,7 @@ try {
  assert.ok(Number(await page.locator('#round-number').textContent())>=2,'Practice turn must advance');
  await page.setViewportSize({width:390,height:844});
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
- assert.equal(await page.locator('.theme-card').count(),8);
+ assert.equal(await page.locator('.theme-card').count(),13);
  for(const id of ["avengers","ben10","shinchan","dc","naruto","cricket","fantasy"])assert.equal(await page.locator('[data-pack-theme="'+id+'"] .release-poster-image').getAttribute('src'),'/assets/theme-posters/'+id+'.jpg');
  for(const id of ['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id);
  // Confirm the actual image URLs return decodable poster bytes, not HTML 404 fallbacks.
@@ -46,6 +46,7 @@ try {
  assert.ok(posterStates.every(p=>p.ok),'All seven actual poster image files must load: '+JSON.stringify(posterStates));
 
  // A real themed practice turn, not a dead-end promotional tile.
+ for(const id of ['dragonball','onepiece','wwe','football','wizarding'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id);
  await page.locator('[data-pack-theme="avengers"]').click();
  await page.waitForURL('**/themes/packs/?theme=avengers');
  await page.locator('#collection-title').filter({hasText:/AVENGERS/i}).waitFor();
