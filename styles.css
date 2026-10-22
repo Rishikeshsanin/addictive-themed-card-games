@@ -93,3 +93,19 @@ html,body,#app{max-width:100%;overflow-x:clip}
  .call-note{font-size:9px}
  .call-dock.minimized{width:164px}
 }
+/* Eight-theme public homepage, with the legacy Pokémon multiplayer untouched. */
+.release-theme-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.release-theme-grid>.pokemon-theme{grid-column:span 2;min-height:330px}
+.release-theme-grid>.release-pack-card{display:block;min-width:0;min-height:330px;isolation:isolate;background:radial-gradient(circle at 65% 35%,color-mix(in srgb,var(--pack-color) 40%,transparent),transparent 62%),linear-gradient(142deg,#262039,#151625 72%);cursor:pointer;transition:transform .2s,border-color .2s,box-shadow .2s}
+.release-theme-grid>.release-pack-card:hover,.release-theme-grid>.release-pack-card:focus-visible{transform:translateY(-5px);border-color:var(--lime);box-shadow:0 16px 40px #0008}
+.release-theme-grid .release-pack-emblem{position:absolute;inset:44px 0 88px;display:flex;align-items:center;justify-content:center;color:var(--pack-color);text-shadow:0 0 36px #0006;font-size:clamp(70px,9vw,145px);font-family:'Space Grotesk',sans-serif;opacity:.78;filter:drop-shadow(0 16px 12px #0007);pointer-events:none}
+.release-theme-grid .release-pack-card .theme-content h3{font-size:clamp(18px,1.45vw,24px);line-height:1.13;margin:9px 0}
+.release-theme-grid .release-pack-card .theme-content>span{font-size:9px}
+.release-theme-grid .release-pack-card .theme-content p{font-size:11px;line-height:1.4}
+.release-theme-grid .release-pack-card .theme-tags i{font-size:8px;padding:6px}
+.release-theme-grid .release-pack-card .theme-top .theme-live{font-size:9px;color:var(--lime)}
+.release-pack-note{margin:19px 2px 0;font-size:12px;line-height:1.75;color:#aaa5c0}
+.release-pack-note b{color:var(--lime)}
+@media(max-width:1100px){.release-theme-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.release-theme-grid>.pokemon-theme{grid-column:span 2}}
+@media(max-width:740px){.release-theme-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.release-theme-grid>.pokemon-theme{grid-column:span 2;min-height:330px}.release-theme-grid>.release-pack-card{min-height:274px;padding:15px}.release-theme-grid .release-pack-card .theme-content{left:15px;right:13px;bottom:16px}.release-theme-grid .release-pack-card .theme-content h3{font-size:17px}.release-theme-grid .release-pack-card .theme-tags i{font-size:7px}.release-theme-grid .release-pack-card .theme-top{left:15px;right:15px;top:15px}}
+@media(max-width:370px){.release-theme-grid>.release-pack-card{min-height:290px}.release-theme-grid .release-pack-card .theme-content h3{font-size:15px}.release-theme-grid .release-pack-card .theme-tags i:nth-child(3){display:none}}
