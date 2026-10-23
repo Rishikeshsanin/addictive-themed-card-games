@@ -1,0 +1,77 @@
+name: "Bug report"
+description: "Report a reproducible DeckVerse problem without exposing private room or session data."
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve DeckVerse. **Pokémon online 1v1** and the **12 solo bot theme packs** use different paths. Do not paste room codes, session tokens, environment variables, private links, personal data or unlicensed character imagery.
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Game mode / area
+      options:
+        - "Pokémon — online 1v1"
+        - "Pokémon — local practice"
+        - "Expansion Theme Lab — local solo bots"
+        - "PWA / installation"
+        - "Accessibility / responsive layout"
+        - "Documentation / repository"
+        - "Other"
+    validations:
+      required: true
+  - type: input
+    id: theme
+    attributes:
+      label: Theme or pack
+      description: "For example Pokémon, Elemental Realms, Cricket Legends (no private room details)."
+      placeholder: "Theme name or N/A"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: "Use a fresh local or non-sensitive example. Number each step."
+      placeholder: |
+        1. Open ...
+        2. Choose ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: "Include error text only after redacting identifiers, credentials and private data."
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser, device, operating system and viewport
+      placeholder: "Chrome 126, Android 14, 390px viewport (example only)"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe screenshots or console observations (optional)
+      description: "Blur usernames, session links, codes and proprietary artwork; no live secrets or raw request payloads."
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety checklist
+      options:
+        - label: "I removed credentials, tokens, private room links/codes and personal data from the report."
+          required: true
+        - label: "I understand unofficial fan content and game ratings are not official franchise statistics."
+          required: true
