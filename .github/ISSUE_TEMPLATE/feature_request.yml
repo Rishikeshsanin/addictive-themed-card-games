@@ -1,0 +1,72 @@
+name: "Feature request"
+description: "Propose a scoped DeckVerse improvement, with realistic mode and security boundaries."
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        DeckVerse currently offers Pokémon online **1v1** and **12 local solo/bot packs**. Additional themes do not have deployed online multiplayer. Please propose a user-facing outcome, not a speculative implementation.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Related product area
+      options:
+        - "Pokémon online 1v1"
+        - "Pokémon classic practice"
+        - "Local expansion bot matches (2 / 3 / 4 seats)"
+        - "Theme discovery / roster"
+        - "Accessibility / mobile usability"
+        - "Performance / reliability"
+        - "Docs / GitHub"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      placeholder: "When ..., I cannot ..., so ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Desired player experience
+      description: "What should users be able to do? Describe expected controls and edge cases."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Existing alternatives or acceptable smaller version
+    validations:
+      required: false
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Anticipated impact
+      options:
+        - "Presentation / documentation only"
+        - "Local client behavior"
+        - "Existing Pokémon online API or privacy"
+        - "Database, migration or shared Hub (requires separate owner approval)"
+        - "Third-party artwork, characters, athlete likeness or licensing"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Suggested acceptance checks
+      placeholder: "Keyboard access, 320px mobile, zero token exposure, correct stats..."
+    validations:
+      required: false
+  - type: checkboxes
+    id: agreement
+    attributes:
+      label: Safety and accuracy
+      options:
+        - label: "This report contains no room tokens, secret values or personal session data."
+          required: true
+        - label: "Any proposed new franchise imagery requires appropriate rights; gameplay scores are editorial, not official data."
+          required: true
