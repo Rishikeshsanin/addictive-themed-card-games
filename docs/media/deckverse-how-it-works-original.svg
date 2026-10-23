@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="720" viewBox="0 0 1440 720" role="img" aria-labelledby="title description">
+<title id="title">DeckVerse three-step battle rules — original infographic</title>
+<desc id="description">A dark indigo neon guide showing three illustrated stages: choose a deck, compare one of eight stats with Rank lower-is-better, and claim winning cards. Pokémon supports online one-versus-one; twelve other packs support solo bot practice with two, three or four seats. This is an original explanatory graphic, not a screenshot.</desc>
+<defs>
+ <linearGradient id="night" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#080916"/><stop offset="1" stop-color="#171033"/></linearGradient>
+ <linearGradient id="lime" x1="0" x2="1"><stop stop-color="#deff83"/><stop offset="1" stop-color="#7deea1"/></linearGradient>
+ <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c6a2ff"/><stop offset="1" stop-color="#7958dc"/></linearGradient>
+ <pattern id="dots" width="25" height="25" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#9d93bc" opacity=".3"/></pattern>
+</defs>
+<rect width="1440" height="720" fill="url(#night)"/><rect width="1440" height="720" fill="url(#dots)"/>
+<rect x="40" y="38" width="1360" height="644" rx="27" fill="#0b0b1a" fill-opacity=".7" stroke="#53437d"/>
+<text x="84" y="94" font-family="Arial,sans-serif" font-size="17" font-weight="700" letter-spacing="4" fill="#bbff85">✦  THE RULES OF THE RIVALRY</text>
+<text x="83" y="155" font-family="Arial,sans-serif" font-size="43" font-weight="800" letter-spacing="-1" fill="#fff">THREE MOVES. <tspan fill="#c7a2ff">ENDLESS REMATCHES.</tspan></text>
+<path d="M84 184H1355" stroke="#746394" stroke-opacity=".6"/>
+<!-- Panel one -->
+<g font-family="Arial,sans-serif">
+ <rect x="84" y="218" width="390" height="316" rx="24" fill="#171831" stroke="#464769" stroke-width="1.5"/>
+ <circle cx="130" cy="264" r="23" fill="url(#lime)"/><text x="118" y="271" font-size="19" font-weight="800" fill="#0d1821">01</text>
+ <text x="165" y="273" font-size="29" font-weight="800" fill="#faf9ff">PICK A DECK</text>
+ <g transform="translate(137 315)">
+ <rect x="0" y="6" width="84" height="135" rx="11" fill="#342650" stroke="#a785e8" stroke-width="2" transform="rotate(-12 42 72)"/>
+ <rect x="96" y="7" width="84" height="135" rx="11" fill="#243344" stroke="#81dcb6" stroke-width="2" transform="rotate(12 138 72)"/>
+ <rect x="48" y="-8" width="91" height="150" rx="12" fill="#272d38" stroke="url(#lime)" stroke-width="3"/>
+ <path d="M94 17L118 61L94 108L70 61Z" stroke="#ddff9e" stroke-width="3" fill="none"/>
+ </g>
+ <text x="113" y="492" font-size="18" fill="#bdbae0">13 themes • 8 comparison stats</text>
+</g>
+<!-- dividers -->
+<path d="M489 375H517M506 366L518 375L506 384" stroke="#b3ff86" stroke-width="4" fill="none"/>
+<!-- Panel two -->
+<g font-family="Arial,sans-serif">
+ <rect x="525" y="218" width="390" height="316" rx="24" fill="#171831" stroke="#464769" stroke-width="1.5"/>
+ <circle cx="571" cy="264" r="23" fill="url(#violet)"/><text x="559" y="271" font-size="19" font-weight="800" fill="#0b0a19">02</text>
+ <text x="606" y="273" font-size="29" font-weight="800" fill="#faf9ff">CALL A STAT</text>
+ <rect x="558" y="316" width="322" height="52" rx="11" fill="#302448" stroke="#986cdf"/>
+ <text x="582" y="348" font-size="19" font-weight="800" fill="#f0dcff">♛ RANK</text>
+ <text x="829" y="348" text-anchor="end" font-size="17" font-weight="800" fill="#d7baff">LOW ↓</text>
+ <rect x="558" y="383" width="322" height="52" rx="11" fill="#253a35" stroke="#8ff2a4"/>
+ <text x="582" y="415" font-size="19" font-weight="800" fill="#defabc">⚡ OTHER STATS</text>
+ <text x="829" y="415" text-anchor="end" font-size="17" font-weight="800" fill="#b7f6c8">HIGH ↑</text>
+ <text x="558" y="491" font-size="17" fill="#bdbae0">Rank is the one exception.</text>
+</g>
+<path d="M927 375H955M944 366L956 375L944 384" stroke="#b3ff86" stroke-width="4" fill="none"/>
+<!-- Panel three -->
+<g font-family="Arial,sans-serif">
+ <rect x="964" y="218" width="390" height="316" rx="24" fill="#171831" stroke="#464769" stroke-width="1.5"/>
+ <circle cx="1010" cy="264" r="23" fill="url(#lime)"/><text x="998" y="271" font-size="19" font-weight="800" fill="#0e1520">03</text>
+ <text x="1045" y="273" font-size="29" font-weight="800" fill="#faf9ff">TAKE THE WIN</text>
+ <g transform="translate(1066 325)" stroke-width="3">
+ <rect width="77" height="115" rx="9" stroke="#bf96fd" fill="#392e57"/>
+ <circle cx="38" cy="49" r="22" stroke="#d2b9fc" fill="none"/>
+ <rect x="92" y="0" width="77" height="115" rx="9" stroke="#baff89" fill="#2b4a3d"/>
+ <path d="M130 26V86M102 56H158" stroke="#d6ffa3"/>
+ <path d="M181 56H211M201 47L212 56L201 65" stroke="#dcff85" fill="none"/>
+ </g>
+ <text x="996" y="492" font-size="17" fill="#bdbae0">Winner collects drawn cards + jackpot</text>
+</g>
+<path d="M84 573H1354" stroke="#50475d"/>
+<rect x="84" y="599" width="581" height="42" rx="9" fill="#b6ff84" fill-opacity=".11"/>
+<text x="104" y="625" font-family="Arial,sans-serif" fill="#d1ffad" font-size="17" font-weight="700">POKÉMON CLASSIC  ·  ONLINE 1v1 + PRACTICE</text>
+<rect x="685" y="599" width="669" height="42" rx="9" fill="#bb9cf9" fill-opacity=".11"/>
+<text x="705" y="625" font-family="Arial,sans-serif" fill="#e4d3ff" font-size="17" font-weight="700">12 EXPANSIONS  ·  LOCAL SOLO 2 / 3 / 4 SEATS VS BOTS</text>
+<text x="1114" y="671" font-family="Arial,sans-serif" font-size="10" letter-spacing="1.5" fill="#83799f">ORIGINAL EDITORIAL INFOGRAPHIC • NOT GAMEPLAY CAPTURE</text>
+</svg>
