@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="810" viewBox="0 0 1440 810" role="img" aria-labelledby="t d">
+<title id="t">DeckVerse — old-school rivalry, new-school magic: original brand concept</title>
+<desc id="d">Illustrated DeckVerse showcase art with three abstract collectible card silhouettes in neon lime, iris purple and midnight indigo. This is original branding artwork, not a gameplay screenshot.</desc>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#070813"/><stop offset=".55" stop-color="#10112c"/><stop offset="1" stop-color="#080713"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#7444ed" stop-opacity=".55"/><stop offset="1" stop-color="#7444ed" stop-opacity="0"/></radialGradient>
+ <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e4ff5b"/><stop offset=".57" stop-color="#8cff63"/><stop offset="1" stop-color="#6afbc8"/></linearGradient>
+ <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#bc8fff"/><stop offset="1" stop-color="#6436cb"/></linearGradient>
+ <linearGradient id="cardbg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#24254d"/><stop offset="1" stop-color="#101122"/></linearGradient>
+ <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse"><path d="M42 0H0V42" fill="none" stroke="#9b91b9" stroke-opacity=".13" stroke-width="1"/></pattern>
+ <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="23"/></filter>
+ <filter id="lit" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
+</defs>
+<rect width="1440" height="810" fill="url(#bg)"/>
+<rect width="1440" height="810" fill="url(#grid)" opacity=".42"/>
+<ellipse cx="1100" cy="390" rx="490" ry="350" fill="url(#glow)"/>
+<path d="M0 648Q380 524 720 694T1440 642" fill="none" stroke="#b4fb68" stroke-opacity=".22" stroke-width="2"/>
+<g fill="#dbff85" font-family="DejaVu Sans,Arial,sans-serif" font-weight="700">
+ <text x="90" y="92" font-size="28" letter-spacing="5">✦  DECK<tspan fill="#bb9cff">VERSE</tspan></text>
+</g>
+<rect x="90" y="139" width="280" height="34" rx="17" fill="#a9f76c" fill-opacity=".12" stroke="#b9fc71" stroke-opacity=".48"/>
+<text x="110" y="161" fill="#d1ffa2" font-size="13" letter-spacing="2.6" font-family="Arial,sans-serif" font-weight="700">COLLECT • COMPARE • CONQUER</text>
+<g fill="#f9f8ff" font-family="DejaVu Sans,Arial,sans-serif" font-weight="800">
+ <text x="86" y="286" font-size="73" letter-spacing="-3">OLD-SCHOOL</text>
+ <text x="87" y="367" font-size="71" letter-spacing="-2" fill="#c59dff">RIVALRY.</text>
+ <text x="86" y="464" font-size="73" letter-spacing="-3">NEW-SCHOOL</text>
+ <text x="87" y="546" font-size="72" letter-spacing="-3" fill="url(#edge)">MAGIC.</text>
+</g>
+<text x="92" y="604" fill="#b3b0ca" font-size="20" font-family="Arial,sans-serif" letter-spacing=".2">Thirteen universes. Eight ways to win.</text>
+<text x="92" y="637" fill="#b3b0ca" font-size="20" font-family="Arial,sans-serif">One timeless card-battle feeling.</text>
+<g font-family="Arial,sans-serif" font-weight="700">
+ <rect x="90" y="679" width="220" height="48" rx="9" fill="url(#edge)"/>
+ <text x="109" y="708" fill="#080e13" font-size="14" letter-spacing="2">13 THEME CHOICES ↗</text>
+ <rect x="328" y="679" width="184" height="48" rx="9" fill="none" stroke="#bfa4f4" stroke-opacity=".74"/>
+ <text x="347" y="708" fill="#dfd0ff" font-size="14" letter-spacing="2">50 / 60 / 80</text>
+</g>
+<!-- Abstract card silhouettes: editorial illustration only, never depicted as real game screenshot -->
+<g transform="translate(1001 450) rotate(-25)" opacity=".85">
+ <rect x="-181" y="-270" width="324" height="468" rx="27" fill="#000" opacity=".4" filter="url(#shadow)"/>
+ <rect x="-181" y="-270" width="324" height="468" rx="27" fill="#17152b" stroke="#7d58da" stroke-width="3"/>
+ <rect x="-160" y="-246" width="282" height="426" rx="18" fill="none" stroke="#8f67e2" stroke-opacity=".45"/>
+ <circle cx="-19" cy="-73" r="106" fill="#7d58d9" fill-opacity=".10" stroke="#8d65d6" stroke-width="2"/>
+ <path d="M-19 -161L49 -73L-19 16L-86 -73Z" fill="none" stroke="#a98aeb" stroke-width="4"/>
+ <text x="-142" y="126" font-family="Arial" font-size="19" font-weight="800" fill="#d6c4ff" letter-spacing="2">COMPARE</text>
+</g>
+<g transform="translate(1241 438) rotate(20)">
+ <rect x="-159" y="-270" width="310" height="476" rx="27" fill="#000" opacity=".5" filter="url(#shadow)"/>
+ <rect x="-159" y="-270" width="310" height="476" rx="27" fill="#141c22" stroke="#b1e961" stroke-width="3"/>
+ <rect x="-138" y="-247" width="268" height="427" rx="18" fill="none" stroke="#b4ef70" stroke-opacity=".44"/>
+ <g fill="none" stroke="#c6ff87" stroke-width="4"><circle cx="-3" cy="-80" r="96"/><path d="M-78 -36L-3 -164L72 -36Z"/><circle cx="-3" cy="-80" r="44"/></g>
+ <text x="-117" y="134" font-family="Arial" font-size="19" font-weight="800" fill="#dbff9b" letter-spacing="2">CLAIM</text>
+</g>
+<g transform="translate(1106 429) rotate(-4)">
+ <rect x="-187" y="-295" width="358" height="513" rx="31" fill="#000" opacity=".64" filter="url(#shadow)"/>
+ <rect x="-187" y="-295" width="358" height="513" rx="31" fill="url(#cardbg)" stroke="url(#edge)" stroke-width="4"/>
+ <rect x="-167" y="-274" width="317" height="470" rx="21" fill="none" stroke="#a8fb6c" stroke-opacity=".38"/>
+ <text x="-145" y="-244" font-family="Arial" font-size="14" fill="#d3ffaf" font-weight="800" letter-spacing="3">DECKVERSE</text>
+ <text x="86" y="-244" font-family="Arial" font-size="12" fill="#d3ffaf" font-weight="800">✦ 001</text>
+ <circle cx="-6" cy="-78" r="135" fill="#af81ff" fill-opacity=".11"/>
+ <g fill="none" stroke="url(#edge)"><circle cx="-9" cy="-97" r="94" stroke-width="3"/><circle cx="-9" cy="-97" r="61" stroke-opacity=".5" stroke-width="2"/><path d="M-9 -210L89 -97L-9 16L-107 -97Z" stroke-width="3"/><path d="M-9 -192V-1M-108 -97H90" stroke-opacity=".6" stroke-width="2"/></g>
+ <path d="M-9 -168L40 -101L-9 -32L-58 -101Z" fill="#bafe83" fill-opacity=".65" filter="url(#lit)"/>
+ <path d="M-9 -168L40 -101L-9 -32L-58 -101Z" fill="#bdff8a" fill-opacity=".18" stroke="#deffb7" stroke-width="3"/>
+ <path d="M-135 47H110" stroke="#a5fe79" stroke-opacity=".58"/>
+ <text x="-141" y="88" font-family="Arial" font-size="22" font-weight="800" fill="#fcfbff" letter-spacing="3">PICK A STAT.</text>
+ <text x="-141" y="120" font-family="Arial" font-size="22" font-weight="800" fill="#bdff81" letter-spacing="3">WIN THE CARD.</text>
+ <rect x="-140" y="148" width="278" height="30" rx="9" fill="#b9fd84" fill-opacity=".09"/>
+ <text x="-126" y="168" font-family="Arial" font-size="12" font-weight="700" fill="#d3ffa8" letter-spacing="1.5">EIGHT COMPARISON AXES</text>
+</g>
+<g font-family="Arial,sans-serif" fill="#938fad">
+ <text x="1196" y="762" font-size="12" letter-spacing="1">ORIGINAL DECKVERSE ARTWORK</text>
+ <text x="1196" y="780" font-size="11">NOT A GAMEPLAY SCREENSHOT</text>
+</g>
+</svg>
