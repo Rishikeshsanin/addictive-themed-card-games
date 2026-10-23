@@ -68,11 +68,35 @@ That's **DeckVerse**: a competitive, collectible-feeling card arena with **13 th
 | **Designed for phones** | Responsive homepage, touch-friendly battle UI and PWA installation |
 | **Security-first game state** | Hidden opponent decks, server-side validation and scoped room sessions for the online flow |
 
-## 🖼️ In-game preview
+## 🖼️ In-game preview — real DeckVerse screenshots
 
-[**Open the live homepage →**](https://addictive-themed-card-games.vercel.app/) &nbsp;|&nbsp; [**Browse the Theme Lab →**](https://addictive-themed-card-games.vercel.app/themes/packs/)
+Captured by **real Chromium browser tests running the application**. These are optimized/cropped screenshots from the repository's CI, **not generated mockups**. The Classic battle includes one deliberate artwork redaction.
 
-Actual desktop/mobile screenshots and an optimized demo clip will be added to this section after capture from the **deployed app**. They are intentionally not represented by fabricated mockups.
+[**Open the live homepage →**](https://addictive-themed-card-games.vercel.app/) &nbsp;|&nbsp; [**Browse the Theme Lab →**](https://addictive-themed-card-games.vercel.app/themes/packs/) &nbsp;|&nbsp; [**Media provenance →**](docs/media/README.md)
+
+<table>
+<tr>
+<td width="66%" valign="top"><a href="docs/media/screenshots/theme-lab-desktop-1366.webp"><img src="docs/media/screenshots/theme-lab-desktop-1366.webp" alt="Actual DeckVerse Theme Lab desktop showing the twelve selectable expansion universes" width="100%"></a></td>
+<td width="34%" valign="top"><a href="docs/media/screenshots/theme-lab-mobile-390.webp"><img src="docs/media/screenshots/theme-lab-mobile-390.webp" alt="Actual mobile DeckVerse Theme Lab on a 390px Chromium viewport" width="100%"></a></td>
+</tr>
+<tr>
+<td align="center"><sub><b>Theme Lab · Desktop</b> — 12 solo theme packs</sub></td>
+<td align="center"><sub><b>Theme Lab · Mobile</b> — 390px</sub></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="42%" valign="top"><a href="docs/media/screenshots/theme-lab-mobile-320.webp"><img src="docs/media/screenshots/theme-lab-mobile-320.webp" alt="Real DeckVerse Theme Lab rendered at narrow 320px mobile width" width="100%"></a></td>
+<td width="58%" valign="top"><a href="docs/media/screenshots/classic-practice-mobile-redacted.webp"><img src="docs/media/screenshots/classic-practice-mobile-redacted.webp" alt="Real Pokémon Classic solo practice round in mobile browser with one character-art area redacted" width="100%"></a></td>
+</tr>
+<tr>
+<td align="center"><sub><b>Small mobile</b> — 320px</sub></td>
+<td align="center"><sub><b>Pokémon Classic practice</b> — artwork redacted</sub></td>
+</tr>
+</table>
+
+<sub>Source: [Theme Lab CI #39833945097](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39833945097) and [Pokémon browser CI #39937836608](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/39937836608). These screenshots were taken from local test builds, not live player sessions. Fan-theme names and existing poster designs may have unresolved third-party rights; see [provenance and usage limitations](docs/media/README.md).</sub>
 
 ## 🛠️ Built with
 
