@@ -28,7 +28,7 @@ Start with the [architecture map](docs/ARCHITECTURE.md), [local development guid
 
 ## Artwork, media and privacy
 
-Fan themes reference third-party properties. **The repository does not establish a redistribution or commercial license for character art, names, posters, athlete likenesses or logos.** Prefer original abstract graphics, or content for which you can document ownership/permission. Never import artwork just because a remote URL renders in the browser. Clearly distinguish an *original illustration* from a *real application screenshot*. Scrub room codes, player names, session tokens, URLs with parameters and personal information. See [media provenance](docs/media/README.md) **once the separate visual PR is integrated**; that file is not part of this branch.
+Fan themes reference third-party properties. **The repository does not establish a redistribution or commercial license for character art, names, posters, athlete likenesses or logos.** Prefer original abstract graphics, or content for which you can document ownership/permission. Never import artwork just because a remote URL renders in the browser. Clearly distinguish an *original illustration* from a *real application screenshot*. Scrub room codes, player names, session tokens, URLs with parameters and personal information. The separate visual-media workstream will provide a media provenance guide; do not link to or imply it is merged until the coordinator integrates its PR.
 
 ## Pull request hygiene
 
