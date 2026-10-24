@@ -2,7 +2,7 @@
 // fictional GAMEPLAY ratings, never official comic/anime power levels or cricket stats.
 // Original art and rights clearance required before publishing named franchise themes.
 import {PACK_ROSTERS,PACK_ENTRY_OVERRIDES} from './rosters.js';
-import {BONUS_PACK_ROSTERS} from './bonus-rosters.js';
+import {BONUS_PACK_ROSTERS,BONUS_ENTRY_OVERRIDES} from './bonus-rosters.js';
 import {BONUS_RATINGS} from './bonus-ratings.js';
 import {CHARACTERS as CURATED_AVENGERS} from './avengers-curated.js';
 
@@ -21,7 +21,7 @@ const configs=[
 {id:'dragonball',name:'Dragon Ball Power Clash',emoji:'🐉',hue:36,tagline:'Saiyans, gods and legendary battles',fields:[rank,stat('strength','STRENGTH','Editorial physical-force rating'),stat('speed','SPEED','Movement and combat reflexes'),stat('ki','KI','Energy projection and ki control'),stat('combat','COMBAT','Martial-arts proficiency'),stat('defense','DEFENSE','Resilience and guarding'),stat('intellect','INTELLECT','Tactics and adaptation'),stat('endurance','ENDURANCE','Long-form battle resilience')],base:{hero:[79,81,81,85,82,78,82],saiyan:[88,84,91,80,88,68,92],villain:[86,76,88,75,89,77,86],cosmic:[96,90,97,86,95,89,95],android:[81,72,80,68,85,82,89]}},
  {id:'onepiece',name:'One Piece Grand Line Clash',emoji:'🏴‍☠️',hue:199,tagline:'Haki, pirates and the race for glory',fields:[rank,stat('strength','STRENGTH','Fighting force'),stat('haki','HAKI','Haki and willpower'),stat('speed','SPEED','Agility and reflexes'),stat('devilfruit','DEVIL FRUIT','Special-power potential'),stat('swordsmanship','SWORDPLAY','Weapon and blade proficiency'),stat('strategy','STRATEGY','Tactical creativity'),stat('endurance','ENDURANCE','Survival and resolve')],base:{pirate:[78,76,81,74,68,81,85],legend:[91,91,87,80,75,85,93],navy:[82,84,80,66,76,90,84],revolution:[83,83,83,70,64,88,87],villain:[81,72,82,89,69,83,86]}},
  {id:'wwe',name:'WWE Wrestling Icons',emoji:'🏆',hue:347,tagline:'Finishing moves and ringside legends',fields:[rank,stat('strength','STRENGTH','Raw grappling power'),stat('technique','TECHNIQUE','Wrestling technique'),stat('agility','AGILITY','Speed and aerial skills'),stat('endurance','ENDURANCE','Match stamina'),stat('finisher','FINISHER','Signature-move impact'),stat('charisma','CHARISMA','Crowd connection'),stat('ringiq','RING IQ','Tactics and ring awareness')],base:{legend:[88,87,70,89,90,95,90],modern:[84,87,83,87,89,92,86],powerhouse:[96,77,53,91,94,83,83],technical:[76,98,94,84,86,82,94],womens:[81,91,91,85,90,91,89]}},
- {id:'football',name:'Football Legends',emoji:'⚽',hue:161,tagline:'The ultimate football icon showdown',fields:[rank,stat('shooting','SHOOTING','Editorial finishing impact'),stat('passing','PASSING','Distribution and playmaking'),stat('dribbling','DRIBBLING','Ball control and creation'),stat('pace','PACE','Speed and athleticism'),stat('defending','DEFENDING','Tackling and positioning'),stat('physical','PHYSICAL','Strength and stamina'),stat('clutch','CLUTCH','High-pressure game impact')],base:{forward:[94,80,91,91,37,81,92],midfielder:[80,97,93,79,67,81,90],defender:[39,75,70,78,97,95,88],women:[89,88,88,86,70,80,91]}},
+ {id:'football',name:'Football Legends',emoji:'⚽',hue:161,tagline:'The ultimate football icon showdown',fields:[rank,stat('shooting','SHOOTING','Editorial finishing impact'),stat('passing','PASSING','Distribution and playmaking'),stat('dribbling','DRIBBLING','Ball control and creation'),stat('pace','PACE','Speed and athleticism'),stat('defending','DEFENDING','Defensive impact including tackling, positioning and goalkeeper shot-stopping'),stat('physical','PHYSICAL','Strength and stamina'),stat('clutch','CLUTCH','High-pressure game impact')],base:{forward:[94,80,91,91,37,81,92],midfielder:[80,97,93,79,67,81,90],defender:[39,75,70,78,97,95,88],goalkeeper:[18,80,40,65,98,89,94],women:[89,88,88,86,70,80,91]}},
  {id:'wizarding',name:'Wizarding Duels',emoji:'🪄',hue:266,tagline:'Spells, courage and magical rivalry',fields:[rank,stat('magic','MAGIC','Spellcasting talent'),stat('dueling','DUELING','Magical-combat technique'),stat('intellect','INTELLECT','Knowledge and inventive thinking'),stat('courage','COURAGE','Bravery under pressure'),stat('defense','DEFENSE','Shielding and resilience'),stat('potions','POTIONS','Crafting and magical knowledge'),stat('charisma','CHARISMA','Influence and leadership')],base:{student:[72,73,80,86,72,72,83],professor:[88,86,93,77,89,88,76],order:[85,91,82,96,88,73,84],dark:[88,89,81,72,83,71,78],legend:[84,78,92,85,77,78,85]}}
 ];
 const iconic={
@@ -53,7 +53,7 @@ function ratings(c,entry){
   return basis.map((v,k)=>clamp(v+(hash(entry.name+':'+k)%15)-7+(k===focus?10:0)-(k===weak?12:0)));
 }
 function interleave(groups,themeId){
- const overrides=PACK_ENTRY_OVERRIDES[themeId]||{};
+ const overrides={...(PACK_ENTRY_OVERRIDES[themeId]||{}),...(BONUS_ENTRY_OVERRIDES[themeId]||{})};
  const queues=groups.map(g=>g.names.map(name=>({name,group:overrides[name]?.group||g.group,role:overrides[name]?.role||g.role})));
  const cards=[];let idx=0;
  while(cards.length<80){
