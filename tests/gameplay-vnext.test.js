@@ -82,7 +82,7 @@ test('Bot difficulty never reads private rival decks; invalid selections are rej
  const s=startPackMatch({themeId:'wwe',playerCount:4,chooser:2,pick,ruleset:'quick'});
  assert.equal(chooseBotCategory(s,2,{difficulty:'expert'}),bestBlindCategory(s,2));
  for(const difficulty of ['easy','normal','expert']){
-  for(let i=0;i<12;i++)assert.ok(getTheme('wwe').categories.some(cat=>cat.key===chooseBotCategory(s,2,{difficulty,pick})));
+  for(let i=0;i<12;i++){const chosen=chooseBotCategory(s,2,{difficulty,pick});assert.ok(getTheme('wwe').categories.some(cat=>cat.key===chosen));}
  }
  assert.throws(()=>chooseBotCategory(s,2,{difficulty:'impossible'}),/Unknown bot difficulty/);
  assert.throws(()=>chooseBotCategory(s,0,{difficulty:'expert'}),/No eligible caller/);
