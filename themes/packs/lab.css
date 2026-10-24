@@ -148,3 +148,8 @@ main{position:relative}.glow{background:radial-gradient(ellipse at 80% 20%,hsl(v
 #game-status{overflow-wrap:anywhere}
 @media(max-width:520px){.rule-explainer{font-size:11px}.arena-controls label{flex:1 1 calc(50% - 8px)}.match-result{padding:22px 12px;border-radius:12px}}
 @media(prefers-reduced-motion:reduce){.match-result,.match-result *{animation:none!important;transition:none!important}}
+
+/* Round outcomes: readable reward signal without variable-ratio mechanics. */
+.reveal .haul-chip{display:inline-flex;justify-self:start;align-items:center;margin-top:7px;padding:7px 12px;border-radius:30px;background:#d3ff6920;color:#e6ffb1;font-size:12px;font-weight:800;letter-spacing:.05em;border:1px solid #d3ff6977}
+.reveal.jackpot-reveal .haul-chip{background:#ffe7a918;border-color:#ffe3a977;color:#ffe6ba}
+@media(prefers-reduced-motion:reduce){.reveal .haul-chip{animation:none!important;transition:none!important}}

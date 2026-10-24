@@ -27,6 +27,8 @@ try {
   assert.equal((await page.locator('.score b').allTextContents()).map(Number).reduce((a,b)=>a+b,0),80);
   await page.locator('.stat-button:not([disabled])').first().click();
   await page.locator('#reveal:not(.hidden)').waitFor();
+  assert.ok(await page.locator('.haul-chip').isVisible(),'Every round visibly reports gained or jackpot cards');
+  assert.match(await page.locator('.haul-chip').textContent(),/CARDS (CLAIMED|IN JACKPOT)/);
   assert.equal(await page.locator('.stat-button:not([disabled])').count(),0,'Cannot issue duplicate moves during reveal');
   await page.locator('#end').click();
   assert.ok(await page.locator('#game').isHidden(),'Exit cancels and hides match');

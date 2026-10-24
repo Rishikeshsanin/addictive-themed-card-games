@@ -99,7 +99,8 @@ function renderGame(){
  $('battle').innerHTML=cards.map(({seat,card})=>'<div class="battle-slot">'+renderBattleCard(card,card===null&&seat!==0,seat)+'<span class="seat-label">'+(seat===0?'YOUR TOP CARD':'BOT '+seat)+'</span></div>').join('');
  if(state.showdown&&g.last){
    const round=g.last;const title=round.kind==='tie'?'TIE — JACKPOT GROWS':round.winner===0?'YOU WIN THE ROUND':round.winner===null?'THE CARDS ARE TIED':'BOT '+round.winner+' WINS';
-   $('reveal').classList.remove('hidden');$('reveal').classList.toggle('jackpot-reveal',round.kind==='tie');$('reveal').classList.toggle('victory-reveal',round.winner===0);$('reveal').innerHTML='<span class="reveal-eyebrow">ROUND '+String(round.round).padStart(2,'0')+' · '+(round.kind==='tie'?'JACKPOT':'SHOWDOWN')+'</span><strong>'+title+'</strong><span>'+escape(p.categories.find(x=>x.key===round.stat).name)+' · '+round.played.map(x=>escape(x.name)+' '+x.value).join(' VS ')+'</span>';
+   const haul=round.kind==='tie'?'✦ '+g.pot.length+' CARDS IN JACKPOT':'✦ '+round.awarded+' CARDS CLAIMED BY '+(round.winner===0?'YOU':'BOT '+round.winner);
+   $('reveal').classList.remove('hidden');$('reveal').classList.toggle('jackpot-reveal',round.kind==='tie');$('reveal').classList.toggle('victory-reveal',round.winner===0);$('reveal').innerHTML='<span class="reveal-eyebrow">ROUND '+String(round.round).padStart(2,'0')+' · '+(round.kind==='tie'?'JACKPOT':'SHOWDOWN')+'</span><strong>'+title+'</strong><span>'+escape(p.categories.find(x=>x.key===round.stat).name)+' · '+round.played.map(x=>escape(x.name)+' '+x.value).join(' VS ')+'</span><span class="haul-chip">'+escape(haul)+'</span>';
  }else $('reveal').classList.add('hidden');
  const forcedRank=g.ruleset==='quick'&&g.round>=g.roundLimit&&g.pot.length>0;
  const myTurn=g.chooser===0&&!complete&&!state.showdown;
