@@ -100,7 +100,11 @@ function renderGame(){
  if(state.showdown&&g.last){
    const round=g.last;const title=round.kind==='tie'?'TIE — JACKPOT GROWS':round.winner===0?'YOU WIN THE ROUND':round.winner===null?'THE CARDS ARE TIED':'BOT '+round.winner+' WINS';
    const haul=round.kind==='tie'?'✦ '+g.pot.length+' CARDS IN JACKPOT':'✦ '+round.awarded+' CARDS CLAIMED BY '+(round.winner===0?'YOU':'BOT '+round.winner);
-   $('reveal').classList.remove('hidden');$('reveal').classList.toggle('jackpot-reveal',round.kind==='tie');$('reveal').classList.toggle('victory-reveal',round.winner===0);$('reveal').innerHTML='<span class="reveal-eyebrow">ROUND '+String(round.round).padStart(2,'0')+' · '+(round.kind==='tie'?'JACKPOT':'SHOWDOWN')+'</span><strong>'+title+'</strong><span>'+escape(p.categories.find(x=>x.key===round.stat).name)+' · '+round.played.map(x=>escape(x.name)+' '+x.value).join(' VS ')+'</span><span class="haul-chip">'+escape(haul)+'</span>';
+   const stat=p.categories.find(x=>x.key===round.stat);
+   const distinct=[...new Set(round.played.map(x=>x.value))].sort((a,b)=>stat.direction==='min'?a-b:b-a);
+   const margin=round.kind==='tie'?'TOP VALUES TIED':round.kind==='sudden-death'?'LAST CARDS SETTLED BY RANK':round.kind==='last-standing'?'LAST REMAINING PLAYER WINS':distinct.length>1?'WINNING MARGIN · '+Math.abs(distinct[0]-distinct[1])+' POINTS':'DECISIVE ROUND';
+   const next=g.status==='finished'?'MATCH FINISHED':g.chooser===0?'YOU CHOOSE NEXT':'BOT '+g.chooser+' CHOOSES NEXT';
+   $('reveal').classList.remove('hidden');$('reveal').classList.toggle('jackpot-reveal',round.kind==='tie');$('reveal').classList.toggle('victory-reveal',round.winner===0);$('reveal').innerHTML='<span class="reveal-eyebrow">ROUND '+String(round.round).padStart(2,'0')+' · '+(round.kind==='tie'?'JACKPOT':'SHOWDOWN')+'</span><strong>'+title+'</strong><span>'+escape(stat.name)+' · '+round.played.map(x=>escape(x.name)+' '+x.value).join(' VS ')+'</span><span class="haul-chip">'+escape(haul)+'</span><span class="round-insight">'+escape(margin)+' · '+escape(next)+'</span>';
  }else $('reveal').classList.add('hidden');
  const forcedRank=g.ruleset==='quick'&&g.round>=g.roundLimit&&g.pot.length>0;
  const myTurn=g.chooser===0&&!complete&&!state.showdown;

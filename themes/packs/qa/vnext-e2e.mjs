@@ -29,6 +29,8 @@ try {
   await page.locator('#reveal:not(.hidden)').waitFor();
   assert.ok(await page.locator('.haul-chip').isVisible(),'Every round visibly reports gained or jackpot cards');
   assert.match(await page.locator('.haul-chip').textContent(),/CARDS (CLAIMED|IN JACKPOT)/);
+  assert.match(await page.locator('.round-insight').textContent(),/NEXT|MATCH FINISHED/,'Reveal identifies the next caller or finished result');
+  assert.match(await page.locator('.round-insight').textContent(),/WINNING MARGIN|TOP VALUES TIED|LAST CARDS SETTLED|LAST REMAINING PLAYER|DECISIVE ROUND/,'Reveal explains why the category result was decisive');
   assert.equal(await page.locator('.stat-button:not([disabled])').count(),0,'Cannot issue duplicate moves during reveal');
   await page.locator('#end').click();
   assert.ok(await page.locator('#game').isHidden(),'Exit cancels and hides match');
