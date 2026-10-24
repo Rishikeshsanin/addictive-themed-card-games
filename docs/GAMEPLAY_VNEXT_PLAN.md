@@ -1,6 +1,6 @@
 # DeckVerse — Gameplay VNext
 
-**Status:** PRODUCT + ENGINEERING PLAN ONLY — no gameplay implementation or release approved by this file.
+**Status:** ACTIVE DRAFT PREVIEW — Quick Clash, 3 fair bot difficulties, rematch/end screen and browser/regression tests implemented on a protected feature branch. NOT released to production.
 
 **Baseline:** `main` SHA `aa57d25832fe2e200bfb65f8d89e3f40dd1b6fc1` (25 Oct 2026, main CI passed, Vercel production READY).  
 **Stable reference:** `backup/deckverse-stable-20261025-aa57d258` (keep unchanged).  
@@ -80,3 +80,13 @@ The priority is **agency and satisfying rounds**, not artificially maximizing se
 
 ## Definition of success
 Players understand each outcome, can choose meaningful categories, see exciting but skippable reveals, choose a short or classic match, enjoy non-cheating bots and immediately rematch. Technical proof covers all twelve packs and no regressions to the original online Pokémon game.
+
+## Implementation checkpoint — 25 October 2026
+
+- Implemented in `themes/packs/engine.js`: `ruleset: 'classic' | 'quick'` with Classic default, Quick Clash limits of 35/42/48 turns for 2/3/4 seats, clean jackpot settlement (Rank-only after cap), winner by owned-card count and best remaining top-card Rank for tied totals; all cards stay conserved.
+- Implemented in `themes/packs/engine.js`: transparent `easy`, `normal`, `expert` bot selections using only the bot's own top card and the public theme manifest; Expert preserves previous behavior.
+- Implemented in `themes/packs/lab.js`, `index.html`, `lab.css`: accessible selectors for rules, bot difficulty, reveal pace, correct deadline messaging, transparent final scorecard and one-click same-settings rematch.
+- Regression coverage in `tests/gameplay-vnext.test.js` and `themes/packs/qa/vnext-e2e.mjs`. The existing Theme Lab browser smoke invokes the new suite.
+- **Verified exact commit `6a9902571535ae3e15c765d0513363c1a66bf58c`:** [CI 40130162596](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/40130162596) SUCCESS, [Theme Packs QA 40130162620](https://github.com/Rishikeshsanin/addictive-themed-card-games/actions/runs/40130162620) SUCCESS, Vercel branch preview READY. Separate seeded inspection finished 180/180 tested Quick Clash matches without card conservation failures (12 themes × 3 seat counts × 5 seeds; no claim of statistical fairness).
+- **Not yet implemented:** broader individual editorial rating fixes, more expressive animations, quantitative before/after retention/user studies, physical-device testing, full thousands-match balance reports, optional richer UX sounds. Long-form Classic remains preserved. Production version and Supabase unchanged.
+- `main` and the `backup/deckverse-stable-20261025-aa57d258` snapshot both still pointed at `aa57d25832fe2e200bfb65f8d89e3f40dd1b6fc1` at verification. This is Git-source safety, not a live database backup.
