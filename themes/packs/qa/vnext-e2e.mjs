@@ -49,4 +49,57 @@ try {
   console.log('VNEXT_BROWSER_PASS '+width+'px: Classic default, Quick Clash, skill selector, round status, turn lock, restart, exit and overflow');
   await context.close();
  }
+
+ // Full browser-played Quick Clash regressions: previous checks only exercised the opening round.
+ // Speed up app-owned reveal/bot delays in this isolated QA page; production code is unchanged.
+ {
+  const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce',serviceWorkers:'block'});
+  const page=await context.newPage(),errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.addInitScript(()=>{
+   const original=window.setTimeout.bind(window);
+   window.setTimeout=(callback,delay,...args)=>original(callback,Math.min(Number(delay)||0,4),...args);
+  });
+  await page.goto('http://127.0.0.1:4173/themes/packs/?qa-first=0',{waitUntil:'domcontentloaded'});
+  for(const {theme,players,skill} of [
+   {theme:'avengers',players:2,skill:'expert'},
+   {theme:'shinchan',players:3,skill:'normal'},
+   {theme:'football',players:4,skill:'easy'}
+  ]){
+   await page.locator('.theme-tile[data-theme="'+theme+'"]').click();
+   await page.locator('#ruleset').selectOption('quick');
+   await page.locator('#difficulty').selectOption(skill);
+   await page.locator('#players').selectOption(String(players));
+   await page.locator('#pace').selectOption('quick');
+   await page.locator('#start').click();
+   let humanChoices=0;
+   while(!(await page.locator('#match-result:not(.hidden)').isVisible())){
+    await page.waitForFunction(()=>{
+     const result=document.getElementById('match-result');
+     return (result&&!result.classList.contains('hidden'))||
+       document.querySelector('.stat-button:not([disabled])');
+    },null,{timeout:15000});
+    if(await page.locator('#match-result:not(.hidden)').isVisible())break;
+    await page.locator('.stat-button:not([disabled])').first().click();
+    assert.ok(++humanChoices<=50,'Match requires an unexpected number of human choices');
+   }
+   const result=await page.locator('#match-result').innerText();
+   assert.match(result,/FINAL CARDS/,'Completed match must display final scores');
+   assert.ok(await page.locator('#rematch').isVisible(),'Completed match must offer a rematch');
+   const cards=(await page.locator('.score b').allTextContents()).map(Number);
+   assert.equal(cards.reduce((a,b)=>a+b,0),players===2?50:players===3?60:80,'All cards remain owned at finish');
+   assert.match(await page.locator('#jackpot').textContent(),/NO JACKPOT CARDS/,'No cards may remain in jackpot');
+   assert.equal(await page.locator('.stat-button:not([disabled])').count(),0,'Finished games cannot accept more moves');
+   await page.locator('#rematch').click();
+   assert.ok(await page.locator('#match-result').isHidden(),'Rematch must dismiss finished result');
+   assert.match(await page.locator('#round-indicator').textContent(),/ROUND 01/,'Rematch starts at round one');
+   assert.match(await page.locator('#round-indicator').textContent(),/QUICK CLASH/,'Rematch retains selected rules');
+   assert.equal((await page.locator('.score b').allTextContents()).map(Number).reduce((a,b)=>a+b,0),players===2?50:players===3?60:80,'Rematch deals full deck');
+   await page.locator('#end').click();
+   assert.ok(await page.locator('#game').isHidden(),'Exit clears the rematch');
+   console.log('VNEXT_FULL_MATCH_PASS '+theme+' '+players+'P '+skill+': end screen, card conservation, jackpot, same-settings rematch');
+  }
+  assert.deepEqual(errors,[],'No uncaught errors in completed Quick Clash browser matches');
+  await context.close();
+ }
 }finally{await browser.close()}
