@@ -121,7 +121,7 @@ const quickSummary={
 };
 const report={
  baseline:'aa57d25832fe2e200bfb65f8d89e3f40dd1b6fc1',
- current:process.env.GITHUB_SHA||'working-tree',
+ current:process.env.VNEXT_HEAD_SHA||process.env.GITHUB_SHA||'working-tree',
  coverage:{themes:THEME_IDS.length,cards:THEME_IDS.length*80,matchedClassicPairs:classics.previous.length,quickMatches:quick.length,allScenariosSeeded:true},
  content:{ratingsEdited:edited,rankOrderChanged:reranked,groupOrRoleChanged:regrouped,allSevenDominationPrevious:oldDom,allSevenDominationCurrent:newDom,dominationReductionPct:pct(oldDom-newDom,oldDom),themes:content},
  classic:{previous:classicSummary(classics.previous),current:classicSummary(classics.current),paired:{finishedOnBoth:classics.pairedFinished,sameWinner:classics.pairedSameWinner,newFinishedFaster:classics.pairedNewLessRounds,newFinishedSlower:classics.pairedNewMoreRounds}},

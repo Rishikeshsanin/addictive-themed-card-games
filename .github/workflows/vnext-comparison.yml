@@ -26,6 +26,7 @@ jobs:
       - name: Run paired Classic and Quick Clash comparison
         env:
           BASELINE_ROOT: /tmp/deckverse-stable
+          VNEXT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: node scripts/compare-deckverse-versions.mjs
       - name: Save inspectable benchmark JSON and Markdown
         if: always()
