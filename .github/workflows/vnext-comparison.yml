@@ -1,0 +1,39 @@
+name: DeckVerse VNext Comparative Benchmark
+on:
+  pull_request:
+    paths:
+      - "themes/packs/**"
+      - "scripts/compare-deckverse-versions.mjs"
+      - ".github/workflows/vnext-comparison.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare-stable-with-vnext:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout VNext candidate and protected baseline history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Materialize immutable protected baseline to temporary worktree
+        run: git worktree add --detach /tmp/deckverse-stable aa57d25832fe2e200bfb65f8d89e3f40dd1b6fc1
+      - name: Run paired Classic and Quick Clash comparison
+        env:
+          BASELINE_ROOT: /tmp/deckverse-stable
+          VNEXT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/compare-deckverse-versions.mjs
+      - name: Save inspectable benchmark JSON and Markdown
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deckverse-vnext-paired-comparison
+          path: |
+            /tmp/deckverse-vnext-comparison.json
+            /tmp/deckverse-vnext-comparison.md
+          if-no-files-found: ignore

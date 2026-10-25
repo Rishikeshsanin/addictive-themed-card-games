@@ -1,5 +1,5 @@
 import {THEME_IDS,getTheme,DECK_SIZE,HAND_SIZE} from './index.js';
-import {startPackMatch,takeTurn,viewFor,bestBlindCategory} from './engine.js';
+import {startPackMatch,takeTurn,viewFor,chooseBotCategory,QUICK_ROUND_LIMIT} from './engine.js';
 const $=id=>document.getElementById(id);
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const state={themeId:'avengers',deckSize:2,group:'all',query:'',sort:'deck',game:null,showdown:false,roundTimer:null,botTimer:null,epoch:0,lastFocus:null};
@@ -18,7 +18,7 @@ function showThemes(){
 }
 function choose(id){
  if(!getTheme(id))return;
- clearTimers();state.game=null;state.showdown=false;$('game').classList.add('hidden');$('end').classList.add('hidden');
+ clearTimers();state.game=null;state.showdown=false;$('match-result').classList.add('hidden');$('game').classList.add('hidden');$('end').classList.add('hidden');
  state.themeId=id;state.group='all';state.query='';$('search').value='';
  document.body.dataset.theme=id;
  state.deckSize=Number($('player-filter').value)||2;
@@ -64,13 +64,14 @@ function closeDetails(){
 function start(){
  clearTimers();
  const qaFirst=(['127.0.0.1','localhost'].includes(location.hostname)&&new URLSearchParams(location.search).has('qa-first'))?0:null;
- state.game=startPackMatch({themeId:state.themeId,playerCount:Number($('players').value),chooser:qaFirst});
+ state.game=startPackMatch({themeId:state.themeId,playerCount:Number($('players').value),chooser:qaFirst,ruleset:$('ruleset').value});
+ $('match-result').classList.add('hidden');
  state.showdown=false;$('game').classList.remove('hidden');$('end').classList.remove('hidden');$('start').textContent='↻ NEW MATCH';
  renderGame();scheduleBot();
  $('arena').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
 }
 function end(){
- clearTimers();state.game=null;state.showdown=false;$('game').classList.add('hidden');$('end').classList.add('hidden');$('start').textContent='⚡ DEAL THE CARDS';
+ clearTimers();state.game=null;state.showdown=false;$('match-result').classList.add('hidden');$('game').classList.add('hidden');$('end').classList.add('hidden');$('start').textContent='⚡ DEAL THE CARDS';
 }
 const renderBattleCard=(c,hidden,seat)=>{
  const p=pack(),last=state.showdown?state.game?.last:null;
@@ -93,21 +94,35 @@ function renderGame(){
  $('scoreboard').innerHTML=v.counts.map((n,i)=>'<span class="score '+(g.chooser===i?'caller':'')+'">'+(i===0?'YOU':'BOT '+i)+' <b>'+n+'</b></span>').join('');
  $('jackpot').textContent=v.pot?'✦ JACKPOT · '+v.pot+' CARDS AT STAKE':'◇ NO JACKPOT CARDS';
  $('jackpot').classList.toggle('jackpot-live',v.pot>0);
- $('round-indicator').textContent='ROUND '+String(g.round+1).padStart(2,'0')+' / '+(g.status==='finished'?'MATCH OVER':'MATCH LIVE');
+ $('round-indicator').textContent='ROUND '+String(g.round+(complete?0:1)).padStart(2,'0')+' / '+(g.ruleset==='quick'?g.roundLimit+' QUICK CLASH':complete?'MATCH OVER':'CLASSIC');
  const cards=g.last&&state.showdown?g.last.played.map(x=>({seat:x.seat,card:currentCard(x.id)})):Array.from({length:g.playerCount},(_,i)=>({seat:i,card:i===0?v.topCard:null}));
  $('battle').innerHTML=cards.map(({seat,card})=>'<div class="battle-slot">'+renderBattleCard(card,card===null&&seat!==0,seat)+'<span class="seat-label">'+(seat===0?'YOUR TOP CARD':'BOT '+seat)+'</span></div>').join('');
  if(state.showdown&&g.last){
    const round=g.last;const title=round.kind==='tie'?'TIE — JACKPOT GROWS':round.winner===0?'YOU WIN THE ROUND':round.winner===null?'THE CARDS ARE TIED':'BOT '+round.winner+' WINS';
-   $('reveal').classList.remove('hidden');$('reveal').classList.toggle('jackpot-reveal',round.kind==='tie');$('reveal').classList.toggle('victory-reveal',round.winner===0);$('reveal').innerHTML='<span class="reveal-eyebrow">ROUND '+String(round.round).padStart(2,'0')+' · '+(round.kind==='tie'?'JACKPOT':'SHOWDOWN')+'</span><strong>'+title+'</strong><span>'+escape(p.categories.find(x=>x.key===round.stat).name)+' · '+round.played.map(x=>escape(x.name)+' '+x.value).join(' VS ')+'</span>';
+   const haul=round.kind==='tie'?'✦ '+g.pot.length+' CARDS IN JACKPOT':'✦ '+round.awarded+' CARDS CLAIMED BY '+(round.winner===0?'YOU':'BOT '+round.winner);
+   const stat=p.categories.find(x=>x.key===round.stat);
+   const distinct=[...new Set(round.played.map(x=>x.value))].sort((a,b)=>stat.direction==='min'?a-b:b-a);
+   const margin=round.kind==='tie'?'TOP VALUES TIED':round.kind==='sudden-death'?'LAST CARDS SETTLED BY RANK':round.kind==='last-standing'?'LAST REMAINING PLAYER WINS':distinct.length>1?'WINNING MARGIN · '+Math.abs(distinct[0]-distinct[1])+' POINTS':'DECISIVE ROUND';
+   const next=g.status==='finished'?'MATCH FINISHED':g.chooser===0?'YOU CHOOSE NEXT':'BOT '+g.chooser+' CHOOSES NEXT';
+   $('reveal').classList.remove('hidden');$('reveal').classList.toggle('jackpot-reveal',round.kind==='tie');$('reveal').classList.toggle('victory-reveal',round.winner===0);$('reveal').innerHTML='<span class="reveal-eyebrow">ROUND '+String(round.round).padStart(2,'0')+' · '+(round.kind==='tie'?'JACKPOT':'SHOWDOWN')+'</span><strong>'+title+'</strong><span>'+escape(stat.name)+' · '+round.played.map(x=>escape(x.name)+' '+x.value).join(' VS ')+'</span><span class="haul-chip">'+escape(haul)+'</span><span class="round-insight">'+escape(margin)+' · '+escape(next)+'</span>';
  }else $('reveal').classList.add('hidden');
+ const forcedRank=g.ruleset==='quick'&&g.round>=g.roundLimit&&g.pot.length>0;
  const myTurn=g.chooser===0&&!complete&&!state.showdown;
- gameStatus(state.showdown?'ROUND '+g.round+' REVEALED':complete?(g.winner===0?'YOU WIN THE MATCH!':'BOT '+g.winner+' WINS THE MATCH'):myTurn?'YOUR TURN TO CHOOSE':'BOT '+g.chooser+' IS CHOOSING...');
+ gameStatus(state.showdown?'ROUND '+g.round+' REVEALED':complete?(g.winner===0?'YOU WIN THE MATCH!':'BOT '+g.winner+' WINS THE MATCH'):forcedRank?'✦ JACKPOT DECIDER · RANK ONLY':myTurn?'YOUR TURN TO CHOOSE':'BOT '+g.chooser+' IS CHOOSING...');
  $('game-status').classList.toggle('is-victory',complete&&g.winner===0);
  $('game-status').classList.toggle('is-finished',complete);
- $('prompt').textContent=complete?'MATCH FINISHED':state.showdown?'ROUND RESULT':myTurn?'PICK YOUR STRONGEST CATEGORY':'WAIT FOR BOT '+g.chooser;
- $('help').textContent=complete?'Use NEW MATCH to play another shuffled game.':state.showdown?'The next hand begins automatically.':myTurn?'Choose using YOUR visible card. Other cards stay hidden.':'The bot chooses from its own card without seeing yours.';
- $('actions').innerHTML=p.categories.map(s=>'<button class="stat-button" data-stat="'+s.key+'" aria-label="Choose '+escape(s.name)+', '+(s.direction==='min'?'lower':'higher')+' wins" '+(myTurn?'':'disabled')+'><span>'+escape(s.name)+'</span><strong>'+(v.topCard?.stats[s.key]??'—')+'</strong><small>'+(s.direction==='min'?'↓ LOWER':'↑ HIGHER')+' WINS</small></button>').join('');
+ $('prompt').textContent=complete?'MATCH FINISHED':state.showdown?'ROUND RESULT':forcedRank?'JACKPOT DECIDER · RANK ONLY':myTurn?'PICK YOUR STRONGEST CATEGORY':'WAIT FOR BOT '+g.chooser;
+ $('help').textContent=complete?'Replay with the same settings or deal a fresh match.':state.showdown?'The next hand begins automatically.':forcedRank?'The Quick Clash limit was reached with a jackpot pending. Rank (LOWER wins) settles it before scoring.':myTurn?'Choose using YOUR visible card. Other cards stay hidden.':'The bot chooses from its own card without seeing yours.';
+ $('actions').innerHTML=p.categories.map(s=>'<button class="stat-button" data-stat="'+s.key+'" aria-label="Choose '+escape(s.name)+', '+(s.direction==='min'?'lower':'higher')+' wins" '+(myTurn&&(!forcedRank||s.key==='rank')?'':'disabled')+'><span>'+escape(s.name)+'</span><strong>'+(v.topCard?.stats[s.key]??'—')+'</strong><small>'+(s.direction==='min'?'↓ LOWER':'↑ HIGHER')+' WINS</small></button>').join('');
  $('actions').querySelectorAll('[data-stat]').forEach(btn=>btn.onclick=()=>move(0,btn.dataset.stat));
+ const result=$('match-result');
+ result.classList.toggle('hidden',!complete||state.showdown);
+ if(complete&&!state.showdown){
+   const held=g.players.map(p=>p.deck.length),tiebreak=g.quickResult?.tieBreak?' · TIE-BREAK: BEST TOP-CARD RANK':'';
+   const info=g.endReason==='round-limit'?'QUICK CLASH · '+g.round+' ROUNDS · MOST CARDS WINS'+tiebreak:'CLASSIC VICTORY · ALL CARDS CLAIMED';
+   result.innerHTML='<span class="match-trophy" aria-hidden="true">'+(g.winner===0?'🏆':'✦')+'</span><strong>'+(g.winner===0?'YOU OWN THE ROUND.':'BOT '+g.winner+' TAKES THE WIN.')+'</strong><span>'+escape(info)+'</span><span>FINAL CARDS · '+held.map((num,i)=>(i===0?'YOU':'BOT '+i)+': '+num).join(' · ')+'</span><button class="cta" id="rematch" type="button">↻ REMATCH SAME SETTINGS</button>';
+   $('rematch').onclick=start;
+ }
 }
 function move(seat,stat){
  const g=state.game;if(!g||state.showdown||g.status!=='playing'||g.chooser!==seat)return;
@@ -118,7 +133,7 @@ function move(seat,stat){
 function scheduleBot(){
  const g=state.game;if(!g||g.status!=='playing'||g.chooser===0||state.showdown)return;
  const epoch=state.epoch;
- state.botTimer=setTimeout(()=>{if(state.epoch!==epoch)return;const active=state.game;if(!active||active.status!=='playing')return;move(active.chooser,bestBlindCategory(active,active.chooser));},pace().bot);
+ state.botTimer=setTimeout(()=>{if(state.epoch!==epoch)return;const active=state.game;if(!active||active.status!=='playing')return;move(active.chooser,chooseBotCategory(active,active.chooser,{difficulty:$('difficulty').value}));},pace().bot);
 }
 $('search').oninput=e=>{state.query=e.target.value.trim();showCards()};
 $('clear-search').onclick=()=>{state.query='';$('search').value='';showCards();$('search').focus()};
@@ -126,6 +141,13 @@ $('sort').onchange=e=>{state.sort=e.target.value;showCards()};
 $('group').onchange=e=>{state.group=e.target.value;showCards()};
 $('player-filter').onchange=e=>{state.deckSize=Number(e.target.value);showCards()};
 $('players').onchange=e=>{if(state.game)end();$('player-filter').value=e.target.value;state.deckSize=Number(e.target.value);showCards()};
+function refreshRules(){
+ $('rule-explainer').textContent=$('ruleset').value==='quick'?'QUICK CLASH · '+QUICK_ROUND_LIMIT[Number($('players').value)]+' rounds, then settle any jackpot. Most cards wins; tied totals use the best top-card Rank.':'CLASSIC · Play until one player collects every card.';
+}
+$('players').addEventListener('change',refreshRules);
+$('ruleset').onchange=()=>{if(state.game)end();refreshRules()};
+$('difficulty').onchange=()=>{if(state.game)end()};
+refreshRules();
 $('start').onclick=start;$('end').onclick=end;$('close').onclick=closeDetails;$('backdrop').onclick=closeDetails;
 document.addEventListener('keydown',e=>{
  if($('details').classList.contains('hidden'))return;

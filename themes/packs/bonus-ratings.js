@@ -120,7 +120,12 @@ export const BONUS_RATINGS=Object.freeze({
       32,
       98,
       81
-    ]
+    ],
+    "Bartolomeo": [77,72,69,96,31,79,85],
+    "Cavendish": [82,75,93,10,97,70,88],
+    "Kin'emon": [76,75,79,35,94,87,85],
+    "Kozuki Oden": [97,97,91,10,100,86,99],
+    "Charlotte Katakuri": [92,92,86,91,20,87,92]
   },
   "wwe": {
     "The Rock": [
@@ -250,7 +255,8 @@ export const BONUS_RATINGS=Object.freeze({
       99,
       89,
       97
-    ]
+    ],
+    "Christiane Endler": [18,78,36,67,98,89,95]
   },
   "wizarding": {
     "Harry Potter": [
@@ -282,12 +288,12 @@ export const BONUS_RATINGS=Object.freeze({
     ],
     "Albus Dumbledore": [
       100,
-      100,
-      100,
-      98,
-      100,
+      94,
       97,
-      99
+      83,
+      95,
+      93,
+      88
     ],
     "Severus Snape": [
       95,
