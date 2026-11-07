@@ -33,7 +33,14 @@ function resetReveal(){clearTimeout(revealTimer);revealTimer=null;renderKey='';$
 function setupScreen(){stopPolling();clearTimeout(botTimer);resetReveal();disconnectCall();callHealthChecked=false;practice=null;session=null;lobbySnapshot=null;latestRound=-1;renderedRound=-1;try{sessionStorage.removeItem('deckverse_session')}catch{}show('setup')}
 function init(){
  $('player-name').value=localStorage.getItem('deckverse_name')||'';
- for(const b of ['top-play','hero-play','pokemon-tile'])$(b).addEventListener('click',setupScreen);
+ $('pokemon-tile').addEventListener('click',setupScreen);
+ // The global Play/Choose Deck controls must show ALL themes, not jump into Pokémon-only setup.
+ const showDeckPicker=()=>{
+  if(screen!=='landing')show('landing');
+  document.getElementById('themes').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+ };
+ $('top-play').addEventListener('click',showDeckPicker);
+ $('hero-play').addEventListener('click',showDeckPicker);
  $('hero-how').addEventListener('click',()=>document.querySelector('#how').scrollIntoView({behavior:'smooth'}));
  $('setup-back').addEventListener('click',()=>show('landing'));
  document.querySelectorAll('.mode-card').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('.mode-card').forEach(n=>n.classList.toggle('selected',n===b))}));

@@ -104,4 +104,38 @@ try {
   assert.deepEqual(errors,[],'No uncaught errors in completed Quick Clash browser matches');
   await context.close();
  }
+
+ // Homepage direct-play links: every universe should lead to a REAL running game, not only a catalog.
+ {
+  const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce',serviceWorkers:'block'});
+  const page=await context.newPage(),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  const packs=['avengers','ben10','shinchan','dc','naruto','cricket','fantasy','dragonball','onepiece','wwe','football','wizarding'];
+  for(const id of packs){
+   await page.goto('http://127.0.0.1:4173/themes/packs/?theme='+id+'&play=1&qa-first=0',{waitUntil:'domcontentloaded'});
+   await page.locator('#game:not(.hidden)').waitFor();
+   assert.equal(await page.locator('body').getAttribute('data-theme'),id);
+   assert.equal(await page.locator('#ruleset').inputValue(),'quick');
+   assert.equal(await page.locator('#players').inputValue(),'2');
+   assert.equal(await page.locator('#difficulty').inputValue(),'normal');
+   assert.equal(await page.locator('.battle-slot').count(),2);
+   assert.equal(await page.locator('.stat-button:not([disabled])').count(),8);
+   assert.equal((await page.locator('.score b').allTextContents()).map(Number).reduce((a,b)=>a+b,0),50);
+   await page.locator('.stat-button:not([disabled])').first().click();
+   await page.locator('#reveal:not(.hidden)').waitFor();
+   await page.locator('#end').click();
+   assert.ok(await page.locator('#game').isHidden());
+   console.log('PACK_DIRECT_PLAY_PASS '+id);
+  }
+  await page.goto('http://127.0.0.1:4173/themes/packs/?theme=naruto',{waitUntil:'domcontentloaded'});
+  assert.equal(await page.locator('#ruleset').inputValue(),'classic','Browsing only preserves Classic default');
+  assert.ok(await page.locator('#game').isHidden());
+  await page.locator('#play-selected').click();
+  await page.locator('#game:not(.hidden)').waitFor();
+  assert.equal(await page.locator('#ruleset').inputValue(),'quick');
+  await page.locator('#end').click();
+  assert.deepEqual(errors,[],'All 12 one-click games must be free of uncaught JS errors');
+  console.log('PACK_DIRECT_PLAY_ALL_PASS 12 themes; collection CTA and Classic default verified');
+  await context.close();
+ }
 }finally{await browser.close()}

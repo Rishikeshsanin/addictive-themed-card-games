@@ -20,6 +20,7 @@ function choose(id){
  if(!getTheme(id))return;
  clearTimers();state.game=null;state.showdown=false;$('match-result').classList.add('hidden');$('game').classList.add('hidden');$('end').classList.add('hidden');
  state.themeId=id;state.group='all';state.query='';$('search').value='';
+ $('play-selected').textContent='⚡ PLAY '+pack().name.toUpperCase()+' NOW';
  document.body.dataset.theme=id;
  state.deckSize=Number($('player-filter').value)||2;
  $('collection-title').textContent=pack().name.toUpperCase();
@@ -149,6 +150,11 @@ $('ruleset').onchange=()=>{if(state.game)end();refreshRules()};
 $('difficulty').onchange=()=>{if(state.game)end()};
 refreshRules();
 $('start').onclick=start;$('end').onclick=end;$('close').onclick=closeDetails;$('backdrop').onclick=closeDetails;
+// One-tap match from the collection area; the full settings remain available in the arena.
+$('play-selected').onclick=()=>{
+ $('players').value='2';$('player-filter').value='2';state.deckSize=2;showCards();
+ $('ruleset').value='quick';$('difficulty').value='normal';$('pace').value='quick';refreshRules();start();
+};
 document.addEventListener('keydown',e=>{
  if($('details').classList.contains('hidden'))return;
  if(e.key==='Escape'){e.preventDefault();closeDetails();return;}
@@ -159,5 +165,8 @@ document.addEventListener('keydown',e=>{
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
  }
 });
-const requestedTheme=new URLSearchParams(location.search).get('theme');
+const searchParams=new URLSearchParams(location.search),requestedTheme=searchParams.get('theme');
 choose(getTheme(requestedTheme)?requestedTheme:'avengers');$('player-filter').value='2';state.deckSize=2;showCards();
+// Homepage theme cards pass play=1: do not strand the player in the catalog.
+// Quick Clash is opt-in via this direct-play link; opening Theme Lab normally retains Classic defaults.
+if(searchParams.get('play')==='1'&&getTheme(requestedTheme))$('play-selected').click();

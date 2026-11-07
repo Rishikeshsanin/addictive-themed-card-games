@@ -153,3 +153,9 @@ main{position:relative}.glow{background:radial-gradient(ellipse at 80% 20%,hsl(v
 .reveal .haul-chip{display:inline-flex;justify-self:start;align-items:center;margin-top:7px;padding:7px 12px;border-radius:30px;background:#d3ff6920;color:#e6ffb1;font-size:12px;font-weight:800;letter-spacing:.05em;border:1px solid #d3ff6977}
 .reveal.jackpot-reveal .haul-chip{background:#ffe7a918;border-color:#ffe3a977;color:#ffe6ba}
 @media(prefers-reduced-motion:reduce){.reveal .haul-chip{animation:none!important;transition:none!important}}
+
+/* Playability fix: visible direct-start control without burying gameplay below 80 cards. */
+.instant-play{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:18px}
+.instant-play .cta{min-height:54px;padding:14px 23px;flex:0 1 auto}
+.instant-play span{font-size:10px;letter-spacing:.045em;font-weight:800;color:#f5d99e;line-height:1.5}
+@media(max-width:520px){.instant-play{align-items:stretch;flex-direction:column}.instant-play .cta{width:100%;min-height:58px}.instant-play span{font-size:9px;text-align:center}}
