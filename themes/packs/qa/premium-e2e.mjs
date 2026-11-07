@@ -1,8 +1,9 @@
 // Independent premium visual / interaction QA. Chromium emulation, not physical phones.
 import assert from 'node:assert/strict';
+import {THEME_IDS} from '../index.js';
 import {chromium} from 'playwright-core';
 const base='http://127.0.0.1:4173/themes/packs/?qa-first=0';
-const themes=['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'];
+const themes=THEME_IDS;
 const widths=[320,390,768,1366];
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 let samples=[];
@@ -34,7 +35,7 @@ try{
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto(base,{waitUntil:'domcontentloaded'});
   await page.locator('.theme-tile').first().waitFor();
-  assert.equal(await page.locator('.theme-tile').count(),7);
+  assert.equal(await page.locator('.theme-tile').count(),12);
   assert.equal(await page.getAttribute('body','data-theme'),'avengers');
   await geometry(page,'landing '+width);
   for(const theme of themes){
@@ -107,7 +108,7 @@ try{
   assert.ok(await page.locator('#game').isHidden());
   assert.deepEqual(errors,[],'No Chromium runtime errors '+width);
   const nav=await page.evaluate(()=>performance.getEntriesByType('navigation')[0]?.duration||0);
-  console.log('PREMIUM_QA_PASS '+width+'px: seven theme identities, sort/group/search, keyboard dialog, reduced motion, 4P reveal, scroll and hit targets; navigation='+nav.toFixed(1)+'ms');
+  console.log('PREMIUM_QA_PASS '+width+'px: twelve theme identities, sort/group/search, keyboard dialog, reduced motion, 4P reveal, scroll and hit targets; navigation='+nav.toFixed(1)+'ms');
   await context.close();
  }
  console.log('PREMIUM_QA_METRICS='+JSON.stringify(samples));

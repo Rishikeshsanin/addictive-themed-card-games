@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {THEME_IDS,THEME_PACKS,getTheme,getCard,DECK_SIZE,HAND_SIZE,validatePack} from '../themes/packs/index.js';
 import {startPackMatch,validateMatch,takeTurn,viewFor,compareCards,shuffle,bestBlindCategory} from '../themes/packs/engine.js';
-test('Seven full playable theme manifests provide 50/60/80 distinct cards',()=>{
- assert.deepEqual([...THEME_IDS],['avengers','ben10','shinchan','dc','naruto','cricket','fantasy']);
+test('Twelve full playable theme manifests provide 50/60/80 distinct cards',()=>{
+ assert.deepEqual([...THEME_IDS],['avengers','ben10','shinchan','dc','naruto','cricket','fantasy','dragonball','onepiece','wwe','football','wizarding']);
  for(const id of THEME_IDS){
   const p=getTheme(id);assert.equal(p.cards.length,80,id);assert.equal(validatePack(p),true);
   assert.equal(new Set(p.cards.map(c=>c.name)).size,80,id);
@@ -88,4 +88,29 @@ test('Avoid duplicated cards in random shuffle, and reject invalid options',()=>
  assert.throws(()=>shuffle([1,2],()=>100),/Invalid random index/);
  assert.throws(()=>startPackMatch({themeId:'missing'}),/Unknown theme/);
  assert.throws(()=>startPackMatch({themeId:'avengers',playerCount:5}),/Only 2, 3, 4/);
+});
+test('Wave 2 adds distinct editorial rosters and genre-specific score axes',()=>{
+ const requested={
+  dragonball:['rank','strength','speed','ki','combat','defense','intellect','endurance'],
+  onepiece:['rank','strength','haki','speed','devilfruit','swordsmanship','strategy','endurance'],
+  wwe:['rank','strength','technique','agility','endurance','finisher','charisma','ringiq'],
+  football:['rank','shooting','passing','dribbling','pace','defending','physical','clutch'],
+  wizarding:['rank','magic','dueling','intellect','courage','defense','potions','charisma']
+ };
+ for(const [id,axes] of Object.entries(requested)){
+  const p=getTheme(id);
+  assert.equal(p.cards.length,80);
+  assert.equal(new Set(p.cards.map(c=>c.name.toLocaleLowerCase())).size,80);
+  assert.deepEqual(p.categories.map(c=>c.key),axes);
+  assert.ok(p.cards.every(c=>!c.image&&!c.imageUrl),'No unlicensed character media embedded');
+  assert.equal(validatePack(p),true);
+ }
+ assert.ok(getTheme('dragonball').cards.some(c=>c.name==='Goku'));
+ assert.ok(getTheme('onepiece').cards.some(c=>c.name==='Monkey D. Luffy'));
+ assert.ok(getTheme('wwe').cards.some(c=>c.name==='The Undertaker'));
+ assert.ok(getTheme('football').cards.some(c=>c.name==='Lionel Messi'));
+ assert.ok(getTheme('wizarding').cards.some(c=>c.name==='Harry Potter'));
+ assert.ok(getTheme('football').cards.find(c=>c.name==='Lionel Messi').stats.dribbling>=95);
+ assert.ok(getTheme('onepiece').cards.find(c=>c.name==='Roronoa Zoro').stats.swordsmanship>=95);
+ assert.ok(getTheme('wizarding').cards.find(c=>c.name==='Hermione Granger').stats.intellect>=95);
 });
