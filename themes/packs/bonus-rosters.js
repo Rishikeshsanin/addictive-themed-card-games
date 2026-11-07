@@ -39,3 +39,19 @@ export const BONUS_PACK_ROSTERS=Object.freeze({
     section("Fantastic Beasts & Legends","legend","Newt Scamander|Tina Goldstein|Queenie Goldstein|Jacob Kowalski|Leta Lestrange|Theseus Scamander|Yusuf Kama|Credence Barebone|Nicolas Flamel|Bathilda Bagshot|Garrick Ollivander|Rita Skeeter|Pius Thicknesse|Madame Maxime|Viktor Krum|Cornelius Fudge")
   ])
 });
+
+
+// Gameplay-only editorial classifications. Applied after deterministic deck interleaving,
+// so correcting a group/role NEVER changes a card ID or 50/60/80-card manifest.
+export const BONUS_ENTRY_OVERRIDES=Object.freeze({
+  onepiece:Object.freeze({
+    'Bartolomeo':{group:'Straw Hat Grand Fleet',role:'pirate'},
+    'Cavendish':{group:'Straw Hat Grand Fleet',role:'pirate'},
+    "Kin'emon":{group:'Wano Allies',role:'pirate'},
+    'Kozuki Oden':{group:'Wano Legends',role:'legend'}
+  }),
+  football:Object.freeze({
+    'Mary Earps':{group:'Goalkeeper Legends',role:'goalkeeper'},
+    'Christiane Endler':{group:'Goalkeeper Legends',role:'goalkeeper'}
+  })
+});

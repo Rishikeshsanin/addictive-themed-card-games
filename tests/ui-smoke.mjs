@@ -9,6 +9,9 @@ try {
  page.on('pageerror',err=>errors.push(err.message));
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
  await page.locator('#hero-play').click();
+ assert.ok(await page.locator('#landing').isVisible(),'Choose Deck shows the complete collection');
+ assert.ok(await page.locator('#setup').isHidden(),'Choose Deck must not force Pokémon setup');
+ await page.locator('#pokemon-tile').click();
  await page.locator('#player-name').fill('Tester');
  await page.locator('#practice-btn').click();
  await page.locator('#my-card .card-name').waitFor({timeout:10000});
@@ -31,7 +34,7 @@ try {
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
  assert.equal(await page.locator('.theme-card').count(),13);
  for(const id of ["avengers","ben10","shinchan","dc","naruto","cricket","fantasy"])assert.equal(await page.locator('[data-pack-theme="'+id+'"] .release-poster-image').getAttribute('src'),'/assets/theme-posters/'+id+'.jpg');
- for(const id of ['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id);
+ for(const id of ['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id+'&play=1');
  // Confirm the actual image URLs return decodable poster bytes, not HTML 404 fallbacks.
  const posterStates=await page.evaluate(async()=>{
   const names=['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'];
@@ -46,12 +49,12 @@ try {
  assert.ok(posterStates.every(p=>p.ok),'All seven actual poster image files must load: '+JSON.stringify(posterStates));
 
  // A real themed practice turn, not a dead-end promotional tile.
- for(const id of ['dragonball','onepiece','wwe','football','wizarding'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id);
+ for(const id of ['dragonball','onepiece','wwe','football','wizarding'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id+'&play=1');
  await page.locator('[data-pack-theme="avengers"]').click();
- await page.waitForURL('**/themes/packs/?theme=avengers');
+ await page.waitForURL('**/themes/packs/?theme=avengers&play=1');
  await page.locator('#collection-title').filter({hasText:/AVENGERS/i}).waitFor();
- await page.locator('#players').selectOption('2');
- await page.locator('#start').click();
+ assert.equal(await page.locator('#ruleset').inputValue(),'quick','Direct Play should start a short match');
+ assert.equal(await page.locator('#players').inputValue(),'2','Direct Play starts with one bot');
  await page.locator('#game:not(.hidden)').waitFor();
  assert.equal(await page.locator('#actions .stat-button').count(),8);
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});

@@ -65,3 +65,9 @@ Marvel/Avengers, Ben 10, DC, Naruto and Shin-chan characters and universes have 
 Each has 80 explicitly named collectible cards, exactly eight stat axes (Rank is lower-wins), 50/60/80-card deck manifests and local two-, three-, four-player bot matches. Ratings are editorial gameplay decisions, **not official franchise statistics or objective sporting measures**. No trademark logos, character likeness images, league badges or actor photographs are added for these new packs.
 
 Solo practice only. The original Pokémon online multiplayer remains unchanged. New themes do not get online rooms until a separately approved database migration and additional API work. No release rights for third-party franchises or player likenesses are asserted.
+
+## Gameplay VNext (draft feature branch; not production)
+
+VNext introduces an opt-in **Quick Clash** (35 / 42 / 48 comparison rounds for 2 / 3 / 4 seats) while preserving **Classic full-deck elimination** as default. Any jackpot pending at the deadline is settled using Rank before scoring, and cards remain conserved; largest owned deck wins, with a top-card Rank tie-break on equal totals. Players can choose Easy, Normal or Expert strategy bots. Bot selection uses public roster scores and only its own top card, never opponents' live decks. **Reveal pace** (Fast/Standard/Relaxed) is independent of game rules. A result screen presents final holdings and a rematch button.
+
+VNext is in [draft PR #60](https://github.com/Rishikeshsanin/addictive-themed-card-games/pull/60), **not merged or deployed to production**. This does not upgrade expansion packs to true online multiplayer. Editorial scores are still in-progress and not official statistics.
