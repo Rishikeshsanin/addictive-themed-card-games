@@ -11,7 +11,7 @@ import postgres from 'postgres';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const file=n=>readFileSync(path.join(root,n),'utf8');
 const migration=file('migrations/007_theme_rooms.sql');
-const themeIDs=['pokemon','avengers','ben10','shinchan','dc','naruto','cricket','fantasy'];
+const themeIDs=['pokemon','avengers','ben10','shinchan','dc','naruto','cricket','fantasy','dragonball','onepiece','wwe','football','wizarding'];
 const database='deckverse_theme_migration_007_test';
 const password='synthetic-ci-only-not-secret';
 function docker(args,timeout=200000){
@@ -38,9 +38,9 @@ const fixture=[
 ].join('\n');
 const fingerprint="SELECT md5(coalesce((SELECT jsonb_agg(to_jsonb(t) ORDER BY id)::text FROM (SELECT id,code,mode,status,state,created_at,updated_at,expires_at,reveal_mode,reveal_seconds,reveal_until,reveal_acks,player_count,host_seat,presence_version FROM deckverse.rooms) t),'[]') || coalesce((SELECT jsonb_agg(to_jsonb(t) ORDER BY room_id,seat)::text FROM (SELECT room_id,seat,name,token_hash,ready,active,joined_at,last_seen_at,left_at FROM deckverse.players) t),'[]')) AS fp";
 const isCI=process.env.CI==='true'||process.env.GITHUB_ACTIONS==='true';
-test('theme 007 matches exactly the seven prototype IDs plus Pokémon and scopes all DDL',async()=>{
+test('theme 007 matches exactly the twelve prototype IDs plus Pokémon and scopes all DDL',async()=>{
  const {THEME_IDS}=await import('../themes/packs/index.js');
- assert.deepEqual([...THEME_IDS],['avengers','ben10','shinchan','dc','naruto','cricket','fantasy']);
+ assert.deepEqual([...THEME_IDS],['avengers','ben10','shinchan','dc','naruto','cricket','fantasy','dragonball','onepiece','wwe','football','wizarding']);
  assert.deepEqual(new Set(['pokemon',...THEME_IDS]),new Set(themeIDs));
  assert.match(migration,/hub\.assert_app_scope\('deckverse','deckverse'\)/);
  assert.match(migration,/DEFAULT 'pokemon'/);

@@ -6,7 +6,8 @@ import {AUDIT_SEED,rosterAudit,seedFor,rng32,runMatch,study,bestCategories,cards
 const packKeys=['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'];
 
 test('all seven thematic 80-card rosters use eight meaningful typed comparisons',()=>{
- assert.deepEqual(THEME_IDS,packKeys);
+ assert.deepEqual(THEME_IDS.slice(0,7),packKeys);
+ assert.equal(THEME_IDS.length,12,'Five newer packs must remain available beside the legacy 560-card audit');
  const inventory=rosterAudit();
  assert.equal(inventory.inventory,560);
  assert.equal(inventory.themeCount,7);

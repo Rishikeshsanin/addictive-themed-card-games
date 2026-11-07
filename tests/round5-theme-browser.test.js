@@ -30,7 +30,7 @@ function step(file,env,{timeout=450000}={}) {
   child.on('exit',(code,signal)=>{clearTimeout(timer);code===0?resolve():reject(Error(file+' exited '+(signal||code)));});
  });
 }
-test('Round 5: isolated PostgreSQL + real Chromium 8 themes x 2/3/4 players (frontend Agent C gate)',{timeout:600000},async t=>{
+test('Round 5: isolated PostgreSQL + real Chromium 13 themes x 2/3/4 players (frontend Agent C gate)',{timeout:1200000},async t=>{
  if(process.env.ROUND5_QA_RUN!=='YES'&&process.env.CI!=='true'){
   t.skip('Opt in with ROUND5_QA_RUN=YES (requires isolated Docker postgres and Chrome)');
   return;
