@@ -12,7 +12,7 @@ const card=(theme,name)=>{
 };
 
 test('560 identities, stable ordered 50/60/80 manifests, Rank-min contract and distinct cards survive',()=>{
- assert.equal(THEME_IDS.length,7);
+ assert.equal(THEME_IDS.length,12);
  for(const id of THEME_IDS){
   const p=THEME_PACKS[id];assert.equal(p.cards.length,80);
   assert.equal(validatePack(p),true);

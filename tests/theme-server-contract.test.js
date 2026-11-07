@@ -13,7 +13,7 @@ import {
   startServerThemeMatch,takeServerThemeTurn,themeViewFor,validateServerThemeMatch
 } from '../src/server/theme-match.js';
 
-const THEMES=['pokemon','avengers','ben10','shinchan','dc','naruto','cricket','fantasy'];
+const THEMES=['pokemon','avengers','ben10','shinchan','dc','naruto','cricket','fantasy','dragonball','onepiece','wwe','football','wizarding'];
 const COUNTS=[2,3,4];
 const picker=n=>0;
 const manifest=id=>({2:[...getServerManifest(id,2)],
@@ -31,7 +31,7 @@ function sampleDefinition(){
       4:Array.from({length:80},(_,i)=>i+1)}
   };
 }
-test('server allowlist EXACTLY eight immutable themes; prototype injection fails closed',()=>{
+test('server allowlist EXACTLY thirteen immutable themes; prototype injection fails closed',()=>{
   assert.deepEqual(ALLOWED_THEME_IDS,THEMES);
   assert.deepEqual(listServerThemes().map(t=>t.id),THEMES);
   assert.ok(Object.isFrozen(ALLOWED_THEME_IDS));
@@ -76,7 +76,7 @@ test('every theme has eight unique stat keys and properly directed rank',()=>{
     else assert.deepEqual(categories.map(c=>c.key),STAT_FIELDS.map(c=>c.key));
   }
 });
-test('all 8 x 3 manifests contain EXACT unique server-approved card IDs',()=>{
+test('all 13 x 3 manifests contain EXACT unique server-approved card IDs',()=>{
   for(const themeId of THEMES)for(const n of COUNTS){
     const ids=getServerManifest(themeId,n);
     assert.equal(ids.length,DECK_SIZE_BY_PLAYERS[n],themeId+' / '+n);
@@ -295,7 +295,7 @@ test('unknown theme/count and unauthorized stored theme switches are rejected',(
 });
 
 
-test('seven theme 2P double-tie rotates chooser, then rank sudden death preserves all cards',()=>{
+test('twelve theme 2P double-tie rotates chooser, then rank sudden death preserves all cards',()=>{
   for(const themeId of THEMES.slice(1)){
     const base=startServerThemeMatch({themeId,playerCount:2,picker,chooser:0});
     let pair;

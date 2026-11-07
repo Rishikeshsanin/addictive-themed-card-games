@@ -2,6 +2,9 @@
 // No DB/API/UI writes, no canonical rating claims, and no hidden-card information
 // is used to choose a category. CI uses small seed batches; use CLI for larger studies.
 import {THEME_IDS,THEME_PACKS,validatePack,DECK_SIZE,HAND_SIZE} from '../themes/packs/index.js';
+// The legacy Round-4 editorial study is intentionally a 560-card historical audit.
+// New five packs are separately validated by 13-theme server/DB and VNext tests.
+const HISTORICAL_AUDIT_THEME_IDS=Object.freeze(['avengers','ben10','shinchan','dc','naruto','cricket','fantasy']);
 import {startPackMatch,takeTurn} from '../themes/packs/engine.js';
 
 export const AUDIT_SEED=20261021;
@@ -134,7 +137,7 @@ function flagsFor(pack,card,full,manifests){
 }
 export function rosterAudit(){
  const themes=[],allCards=[];
- for(const id of THEME_IDS){
+ for(const id of HISTORICAL_AUDIT_THEME_IDS){
   if(!importantIds.has(id))throw Error('unexpected theme '+id);
   const p=THEME_PACKS[id];
   validatePack(p);
@@ -182,7 +185,7 @@ export function rosterAudit(){
    highestRisk:severe.slice(0,12).map(c=>({id:c.id,name:c.name,severity:c.severity,flags:c.flags}))};
   themes.push(result);allCards.push(...cardReviews.map(c=>({themeId:id,...c})));
  }
- return {version:1,themeCount:THEME_IDS.length,inventory:allCards.length,themes,allCards};
+ return {version:1,themeCount:HISTORICAL_AUDIT_THEME_IDS.length,inventory:allCards.length,themes,allCards};
 }
 export function bestCategories(pack,size){
  const list=pack.decks[size],cards=new Map(pack.cards.map(c=>[c.id,c]));
@@ -231,7 +234,7 @@ export function runMatch({themeId,size,seed,chooser,method='best',cap=1600,optim
 export function study({seeds=12,seed=AUDIT_SEED,cap=1600,methods=['best','random']}={}){
  requireStudyOptions({seeds,seed,cap,methods});
  const scenarios=[];
- for(const id of THEME_IDS)for(const size of [2,3,4]){
+ for(const id of HISTORICAL_AUDIT_THEME_IDS)for(const size of [2,3,4]){
   const pack=THEME_PACKS[id],pre=bestCategories(pack,size);
   for(const method of methods){
    const runs=[],clusters=[];

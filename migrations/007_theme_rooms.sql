@@ -74,7 +74,7 @@ BEGIN
     SELECT array_agg(m[1] ORDER BY m[1]) INTO allowed
     FROM regexp_matches(definition, '''([^'']+)''', 'g') AS m;
     IF allowed IS DISTINCT FROM ARRAY[
-      'avengers','ben10','cricket','dc','fantasy','naruto','pokemon','shinchan'
+      'avengers','ben10','cricket','dc','dragonball','fantasy','football','naruto','onepiece','pokemon','shinchan','wizarding','wwe'
     ]::text[] OR definition NOT LIKE '%theme_id%' THEN
       RAISE EXCEPTION '007 existing theme allowlist CHECK is incompatible: %', definition;
     END IF;
@@ -90,7 +90,7 @@ ALTER TABLE deckverse.rooms
   ADD COLUMN IF NOT EXISTS theme_id varchar(32) NOT NULL DEFAULT 'pokemon';
 
 -- Explicit, DB-enforced allowlist; the server must independently validate the
--- same eight IDs and only pick packs available in its authenticated registry.
+-- same thirteen IDs and only pick packs available in its authenticated registry.
 DO $dv007_check$
 BEGIN
   IF NOT EXISTS (
@@ -101,8 +101,7 @@ BEGIN
     ALTER TABLE deckverse.rooms
       ADD CONSTRAINT rooms_theme_id_check
       CHECK (theme_id IN (
-        'pokemon','avengers','ben10','shinchan',
-        'dc','naruto','cricket','fantasy'
+        'pokemon','avengers','ben10','shinchan','dc','naruto','cricket','fantasy','dragonball','onepiece','wwe','football','wizarding'
       )) NOT VALID;
   END IF;
 END $dv007_check$;
@@ -169,7 +168,7 @@ BEGIN
   SELECT array_agg(m[1] ORDER BY m[1]) INTO allowed
     FROM regexp_matches(coalesce(definition, ''), '''([^'']+)''', 'g') AS m;
   IF allowed IS DISTINCT FROM ARRAY[
-    'avengers','ben10','cricket','dc','fantasy','naruto','pokemon','shinchan'
+    'avengers','ben10','cricket','dc','dragonball','fantasy','football','naruto','onepiece','pokemon','shinchan','wizarding','wwe'
   ]::text[] OR definition NOT LIKE '%theme_id%' THEN
     RAISE EXCEPTION '007 theme allowlist postcondition failed: %', definition;
   END IF;
@@ -190,7 +189,7 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM deckverse.rooms WHERE theme_id IS DISTINCT FROM 'pokemon'
       AND theme_id NOT IN (
-        'avengers','ben10','shinchan','dc','naruto','cricket','fantasy'
+        'avengers','ben10','shinchan','dc','naruto','cricket','fantasy','dragonball','onepiece','wwe','football','wizarding'
       )
   ) THEN RAISE EXCEPTION '007 unexpected theme_id in existing rooms'; END IF;
 END $dv007_verify$;

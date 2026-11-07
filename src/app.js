@@ -12,7 +12,12 @@ const THEME_LOOKS=Object.freeze({
  pokemon:{name:'POKÉMON',symbol:'⚡'},avengers:{name:'AVENGERS SAGA',symbol:'✦'},
  ben10:{name:'BEN 10 ALIEN CLASH',symbol:'◎'},shinchan:{name:'SHIN-CHAN CHAOS',symbol:'✿'},
  dc:{name:'DC LEGENDS',symbol:'◆'},naruto:{name:'NARUTO SHINOBI CLASH',symbol:'◈'},
- cricket:{name:'CRICKET LEGENDS',symbol:'★'},fantasy:{name:'ELEMENTAL REALMS',symbol:'✧'}
+ cricket:{name:'CRICKET LEGENDS',symbol:'★'},fantasy:{name:'ELEMENTAL REALMS',symbol:'✧'},
+ dragonball:{name:'DRAGON BALL POWER CLASH',symbol:'✺'},
+ onepiece:{name:'ONE PIECE GRAND LINE CLASH',symbol:'☠'},
+ wwe:{name:'WWE WRESTLING ICONS',symbol:'✹'},
+ football:{name:'FOOTBALL LEGENDS',symbol:'⚽'},
+ wizarding:{name:'WIZARDING DUELS',symbol:'✧'}
 });
 let selectedThemeId='pokemon';
 const themeLook=id=>THEME_LOOKS[id]||THEME_LOOKS.pokemon;

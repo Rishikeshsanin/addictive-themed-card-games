@@ -4,7 +4,8 @@ import {CATALOG, DECKS, STAT_FIELDS} from '../catalog.js';
 import {THEME_PACKS} from '../../themes/packs/index.js';
 
 export const ALLOWED_THEME_IDS = Object.freeze([
-  'pokemon','avengers','ben10','shinchan','dc','naruto','cricket','fantasy'
+  'pokemon','avengers','ben10','shinchan','dc','naruto','cricket','fantasy',
+  'dragonball','onepiece','wwe','football','wizarding'
 ]);
 export const DECK_SIZE_BY_PLAYERS = Object.freeze({2:50,3:60,4:80});
 export const HAND_SIZE_BY_PLAYERS = Object.freeze({2:25,3:20,4:20});
