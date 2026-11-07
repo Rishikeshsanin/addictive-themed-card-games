@@ -73,6 +73,30 @@ async function themeStoragePlan(db,themeId){
     AND NOT t.tgisinternal AND t.tgenabled='O') AS trigger_ready`;
  return resolveThemeStoragePlan(row,themeId);
 }
+// Health must not report invite rooms READY merely because the SQL role can log in.
+// V2 room fields, durable rate-limit storage and the immutable theme contract
+// must be present. This is a READ-ONLY catalog probe; migrations never run on startup.
+async function ensureInviteSchemaReady(db){
+ const [schema]=await db`SELECT
+  to_regclass('deckverse.rate_limit_counters') IS NOT NULL AS durable_limit_ready,
+  EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('deckverse.rooms')
+    AND attname='player_count' AND NOT attisdropped AND attnotnull) AS player_count_ready,
+  EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('deckverse.rooms')
+    AND attname='host_seat' AND NOT attisdropped AND attnotnull) AS host_seat_ready,
+  EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('deckverse.rooms')
+    AND attname='presence_version' AND NOT attisdropped AND attnotnull) AS presence_ready`;
+ if(Object.values(schema).some(value=>value!==true))
+  throw fail('Friend room database upgrade is not installed.',503);
+ await themeStoragePlan(db,'wizarding');
+ const [check]=await db`SELECT pg_get_constraintdef(oid) AS definition
+   FROM pg_constraint WHERE conrelid=to_regclass('deckverse.rooms')
+   AND conname='rooms_theme_id_check' AND contype='c' AND convalidated`;
+ if(!check||!['pokemon','avengers','ben10','shinchan','dc','naruto','cricket','fantasy',
+   'dragonball','onepiece','wwe','football','wizarding']
+    .every(id=>check.definition.includes("'"+id+"'")))
+  throw fail('All-theme room storage allowlist is not installed.',503);
+ return true;
+}
 let verified=false;
 async function connected(){if(!sql)throw fail('Game rooms are awaiting an isolated database connection. Solo practice is available.',503);if(!verified){const [r]=await sql`select current_user as role`;if(r.role!=='deckverse_app')throw fail('Game backend configuration failed its dedicated-role security check.',503);verified=true;}return sql}
 export const safeName=n=>{if(typeof n!=='string'||n.trim().length<2||n.trim().length>24||/[<>\p{Cc}\p{Cf}]/u.test(n))throw fail('Name must be 2–24 visible characters without HTML symbols.');return n.trim()};
@@ -268,7 +292,7 @@ async function action(db,b){
 }
 export default async function handler(req,res){
  res.setHeader('cache-control','no-store');res.setHeader('x-content-type-options','nosniff');
- if(req.method==='GET'){if(new URL(req.url,'https://deckverse.invalid').searchParams.has('health')){try{await connected();return res.status(200).json({status:'ready',app:'deckverse'})}catch{return res.status(503).json({status:'setup_required',app:'deckverse'})}}return res.status(405).json({error:'POST required.'})}
+ if(req.method==='GET'){if(new URL(req.url,'https://deckverse.invalid').searchParams.has('health')){try{const db=await connected();await ensureInviteSchemaReady(db);return res.status(200).json({status:'ready',app:'deckverse'})}catch{return res.status(503).json({status:'setup_required',app:'deckverse'})}}return res.status(405).json({error:'POST required.'})}
  if(req.method!=='POST')return res.status(405).json({error:'POST required.'});
  try{
   const db=await connected();const b=validateGameRequestBody(req.body);
