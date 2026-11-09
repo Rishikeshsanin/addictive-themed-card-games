@@ -51,3 +51,4 @@ try{
 }finally{await browser.close()}
 // Premium Theme Lab checks run in the existing isolated browser workflow.
 await import('./premium-e2e.mjs');
+await import('./vnext-e2e.mjs');
