@@ -29,32 +29,16 @@ try {
  assert.ok(Number(await page.locator('#round-number').textContent())>=2,'Practice turn must advance');
  await page.setViewportSize({width:390,height:844});
  await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
- assert.equal(await page.locator('.theme-card').count(),13);
- for(const id of ["avengers","ben10","shinchan","dc","naruto","cricket","fantasy"])assert.equal(await page.locator('[data-pack-theme="'+id+'"] .release-poster-image').getAttribute('src'),'/assets/theme-posters/'+id+'.jpg');
- for(const id of ['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id);
- // Confirm the actual image URLs return decodable poster bytes, not HTML 404 fallbacks.
- const posterStates=await page.evaluate(async()=>{
-  const names=['avengers','ben10','shinchan','dc','naruto','cricket','fantasy'];
-  return Promise.all(names.map(async name=>{
-   const url='/assets/theme-posters/'+name+'.jpg';
-   const response=await fetch(url,{cache:'no-store'});
-   if(!response.ok)return {name,ok:false,status:response.status};
-   const blob=await response.blob();
-   return {name,ok:blob.type.startsWith('image/')&&blob.size>10000,type:blob.type,size:blob.size};
-  }));
- });
- assert.ok(posterStates.every(p=>p.ok),'All seven actual poster image files must load: '+JSON.stringify(posterStates));
-
- // A real themed practice turn, not a dead-end promotional tile.
- for(const id of ['dragonball','onepiece','wwe','football','wizarding'])assert.equal(await page.locator('[data-pack-theme="'+id+'"]').getAttribute('href'),'/themes/packs/?theme='+id);
- await page.locator('[data-pack-theme="avengers"]').click();
- await page.waitForURL('**/themes/packs/?theme=avengers');
- await page.locator('#collection-title').filter({hasText:/AVENGERS/i}).waitFor();
- await page.locator('#players').selectOption('2');
- await page.locator('#start').click();
- await page.locator('#game:not(.hidden)').waitFor();
- assert.equal(await page.locator('#actions .stat-button').count(),8);
- await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
+ assert.equal(await page.locator('.theme-card').count(),3);
+ assert.equal(await page.locator('[data-theme-id].theme-entry').count(),12,'All twelve expansion tile choices must exist');
+ assert.equal(await page.locator('[data-choose-theme]').count(),13,'Every universe must be selectable at online room creation');
+ for(const theme of ['dragonball','onepiece','wwe','football','wizarding']){
+  await page.locator('[data-theme-id="'+theme+'"]').click();
+  assert.ok(await page.locator('#setup').isVisible(),'Online create form opens for '+theme);
+  assert.equal(await page.locator('[data-choose-theme="'+theme+'"]').getAttribute('aria-pressed'),'true','Host selection must match clicked tile');
+  assert.match(await page.locator('#selected-theme-note').textContent(),/private room/i);
+  await page.locator('#setup-back').click();
+ }
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
  if(overflow>2)console.log('OVERFLOW ELEMENTS',JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].map(e=>{const r=e.getBoundingClientRect();return {tag:e.tagName,cls:typeof e.className==='string'?e.className:'',right:Math.round(r.right),left:Math.round(r.left),w:Math.round(r.width),scroll:e.scrollWidth}}).filter(e=>e.right>window.innerWidth+4||e.left<-4).sort((a,b)=>b.right-a.right).slice(0,18))));
  assert.ok(overflow<=2,'Mobile viewport should not overflow, overflow='+overflow);
