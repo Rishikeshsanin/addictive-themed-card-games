@@ -17,16 +17,31 @@ export function shuffle(ids,pick=secureIndex){
 }
 const activeSeats=state=>state.players.flatMap((p,i)=>p.deck.length?[i]:[]);
 const nextSeat=(seats,from)=>seats.find(i=>i>from)??seats[0];
-export function startPackMatch({themeId,playerCount=2,pick=secureIndex,chooser=null}={}){
+export const QUICK_ROUND_LIMIT=Object.freeze({2:35,3:42,4:48});
+export const RULESETS=Object.freeze(['classic','quick']);
+const bestTopRank=(s,seat)=>getCard(s.themeId,s.players[seat].deck[0])?.stats.rank??Infinity;
+// Quick Clash awards victory by cards HELD, not by confiscating rivals' remaining cards.
+// A tied card count is settled by the best currently exposed Rank; unique ranks guarantee a winner.
+function concludeQuick(s){
+ const counts=s.players.map(p=>p.deck.length);
+ const high=Math.max(...counts);
+ const leaders=counts.flatMap((count,seat)=>count===high?[seat]:[]);
+ const winner=leaders.sort((a,b)=>bestTopRank(s,a)-bestTopRank(s,b))[0];
+ s.status='finished';s.winner=winner;s.chooser=winner;s.endReason='round-limit';
+ s.quickResult={counts,limit:s.roundLimit,tieBreak:leaders.length>1?'top-card-rank':null};
+}
+
+export function startPackMatch({themeId,playerCount=2,pick=secureIndex,chooser=null,ruleset='classic'}={}){
  const theme=getTheme(themeId),n=Number(playerCount);
  assert(theme,'Unknown theme');assert([2,3,4].includes(n),'Only 2, 3, 4 player matches');
+ assert(RULESETS.includes(ruleset),'Unknown match ruleset');
  const ids=theme.decks[n];
  assert(ids.length===DECK_SIZE[n]&&new Set(ids).size===ids.length,'Invalid theme deck');
  const cards=shuffle(ids,pick);
  const chosen=chooser===null?pick(n):chooser;
  assert(Number.isInteger(chosen)&&chosen>=0&&chosen<n,'Invalid initial caller');
  const hand=HAND_SIZE[n];
- const state={version:'theme-match-v1',themeId,playerCount:n,total:cards.length,players:Array.from({length:n},(_,i)=>({deck:cards.slice(i*hand,(i+1)*hand)})),pot:[],chooser:chosen,round:0,consecutiveTies:0,status:'playing',winner:null,last:null};
+ const state={version:'theme-match-v1',themeId,playerCount:n,total:cards.length,players:Array.from({length:n},(_,i)=>({deck:cards.slice(i*hand,(i+1)*hand)})),pot:[],chooser:chosen,round:0,consecutiveTies:0,status:'playing',winner:null,last:null,ruleset,roundLimit:ruleset==='quick'?QUICK_ROUND_LIMIT[n]:null,endReason:null,quickResult:null};
  validateMatch(state);return state;
 }
 export function validateMatch(s){
@@ -39,6 +54,11 @@ export function validateMatch(s){
  assert(all.length===s.total&&new Set(all).size===all.length,'Card conservation failure');
  assert(all.every(id=>p.decks[s.playerCount].includes(id)),'Foreign card in match');
  assert(['playing','finished'].includes(s.status),'Invalid phase');
+ assert(RULESETS.includes(s.ruleset),'Invalid match ruleset');
+ assert(s.roundLimit===(s.ruleset==='quick'?QUICK_ROUND_LIMIT[s.playerCount]:null),'Invalid round limit');
+ if(s.ruleset==='classic')assert(s.endReason!=='round-limit'&&!s.quickResult,'Classic must not be round capped');
+ if(s.endReason==='round-limit')assert(s.ruleset==='quick'&&s.status==='finished'&&s.round>=s.roundLimit&&s.pot.length===0,'Invalid quick finish');
+ if(s.status==='playing')assert(s.winner===null,'Premature winner');
  if(s.status==='finished')assert(Number.isInteger(s.winner)&&s.winner>=0&&s.winner<s.playerCount,'Invalid winner');
  return true;
 }
@@ -58,6 +78,7 @@ export function takeTurn(previous,actor,categoryKey){
  const pack=getTheme(previous.themeId);
  const stat=pack.categories.find(x=>x.key===categoryKey);
  assert(stat,'Invalid category');
+ if(previous.ruleset==='quick'&&previous.round>=previous.roundLimit&&previous.pot.length>0)assert(categoryKey==='rank','Resolve the jackpot with Rank first');
  const s=structuredClone(previous);
  const seats=activeSeats(s);
  assert(seats.length>=2&&seats.includes(actor),'Insufficient live cards');
@@ -87,7 +108,8 @@ export function takeTurn(previous,actor,categoryKey){
    s.players[winner].deck.push(...awarded);s.pot=[];s.chooser=winner;s.consecutiveTies=0;
  }
  const live=activeSeats(s);
- if(live.length===1&&!s.pot.length){s.status='finished';s.winner=live[0];s.chooser=live[0];}
+ if(live.length===1&&!s.pot.length){s.status='finished';s.winner=live[0];s.chooser=live[0];s.endReason='elimination';}
+ else if(s.ruleset==='quick'&&s.round>=s.roundLimit&&!s.pot.length)concludeQuick(s);
  s.last={round:s.round,kind,stat:categoryKey,played:played.map(x=>({...x,name:getCard(s.themeId,x.id).name,value:getCard(s.themeId,x.id).stats[categoryKey]})),winner,awarded:awarded.length,counts:s.players.map(p=>p.deck.length),pot:s.pot.length};
  validateMatch(s);return s;
 }
@@ -95,15 +117,16 @@ export function viewFor(state,seat){
  validateMatch(state);
  assert(Number.isInteger(seat)&&seat>=0&&seat<state.playerCount,'Invalid viewer');
  const own=state.players[seat].deck[0];
- return {themeId:state.themeId,playerCount:state.playerCount,total:state.total,round:state.round,status:state.status,chooser:state.chooser,winner:state.winner,counts:state.players.map(p=>p.deck.length),pot:state.pot.length,last:state.last?structuredClone(state.last):null,topCard:own?getCard(state.themeId,own):null};
+ return {themeId:state.themeId,playerCount:state.playerCount,total:state.total,round:state.round,status:state.status,chooser:state.chooser,winner:state.winner,counts:state.players.map(p=>p.deck.length),pot:state.pot.length,last:state.last?structuredClone(state.last):null,topCard:own?getCard(state.themeId,own):null,ruleset:state.ruleset,roundLimit:state.roundLimit,endReason:state.endReason,quickResult:state.quickResult?structuredClone(state.quickResult):null};
 }
-export const bestBlindCategory=(state,seat)=>{
+const scoreBlindCategories=(state,seat)=>{
  validateMatch(state);
  const pack=getTheme(state.themeId),top=state.players[seat]?.deck[0];
  assert(top&&state.chooser===seat,'No eligible caller');
  const self=getCard(state.themeId,top);
+ // Uses the published full manifest, NEVER the live private opponent decks or future order.
  const rivals=pack.decks[state.playerCount].filter(id=>id!==top);
- const ranked=pack.categories.map(cat=>{
+ return pack.categories.map(cat=>{
   let points=0;
   for(const id of rivals){
    const other=getCard(state.themeId,id).stats[cat.key],mine=self.stats[cat.key];
@@ -111,5 +134,19 @@ export const bestBlindCategory=(state,seat)=>{
   }
   return {key:cat.key,score:points};
  }).sort((a,b)=>b.score-a.score||pack.categories.findIndex(x=>x.key===a.key)-pack.categories.findIndex(x=>x.key===b.key));
- return ranked[0].key;
 };
+export const bestBlindCategory=(state,seat)=>{
+ return scoreBlindCategories(state,seat)[0].key;
+};
+// Different bot strategies draw ONLY on its own visible top card and public card ratings.
+// No additional opponent/deck-order information is passed to this selector.
+export function chooseBotCategory(state,seat,{difficulty='expert',pick=secureIndex}={}){
+ if(state.ruleset==='quick'&&state.round>=state.roundLimit&&state.pot.length)return 'rank';
+ assert(['easy','normal','expert'].includes(difficulty),'Unknown bot difficulty');
+ const ranked=scoreBlindCategories(state,seat);
+ if(difficulty==='expert')return ranked[0].key;
+ const pool=ranked.slice(0,difficulty==='normal'?3:6);
+ const index=pick(pool.length);
+ assert(Number.isInteger(index)&&index>=0&&index<pool.length,'Invalid bot random index');
+ return pool[index].key;
+}
