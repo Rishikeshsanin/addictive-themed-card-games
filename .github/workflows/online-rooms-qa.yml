@@ -83,12 +83,21 @@ jobs:
         run: |
           node --check tests/online-db-setup.mjs
           node --check tests/online-http-e2e.mjs
+          node --check tests/online-browser-e2e.mjs
 
       - name: Create fictional original Pokémon schema; add ONLY isolated online tables
         run: node tests/online-db-setup.mjs
 
       - name: Real localhost HTTP + restricted-role PostgreSQL theme E2E
         run: node tests/online-http-e2e.mjs
+
+      - name: Real Chromium 39 API + 39 click-driven multiplayer cases
+        env:
+          ROUND5_LOCAL_ONLY: 'YES'
+          DB_INTEGRATION_LOCAL_ONLY: 'YES'
+          DB_INTEGRATION_ADMIN_URL: 'postgres://postgres:round5_fake_admin_only@127.0.0.1:5432/deckverse_round5_ci?sslmode=require'
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node tests/online-browser-e2e.mjs
 
       - name: Report disposable-only test boundary
         if: success()
