@@ -43,7 +43,7 @@ try{
  assert.doesNotMatch(migration,/ALTER TABLE deckverse\\.(?:rooms|players)\\b/i);
  const oldDigest="SELECT md5((SELECT jsonb_agg(to_jsonb(r) ORDER BY r.id)::text FROM deckverse.rooms r) || (SELECT jsonb_agg(to_jsonb(p) ORDER BY p.room_id,p.seat)::text FROM deckverse.players p)) AS fingerprint";
  const before=(await admin.unsafe(oldDigest))[0].fingerprint;
- await admin.unsafe('BEGIN;\\n'+migration+'\\nCOMMIT;').simple();
+ await admin.unsafe('BEGIN;\n'+migration+'\nCOMMIT;').simple();
  const after=(await admin.unsafe(oldDigest))[0].fingerprint;
  assert.equal(after,before,'Original Pokemon rooms or players were changed');
  console.log('ONLINE_ISOLATION_MIGRATION_PASS old Pokemon fingerprint preserved');
