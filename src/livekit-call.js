@@ -158,8 +158,9 @@ function failureMessage(error, media = 'call') {
  if (name === 'AbortError') return `${media} was interrupted · try again`;
  return `${media} unavailable · gameplay continues`;
 }
-export async function getCallAvailability() {
- try { const r = await fetch('/api/livekit-token', { cache: 'no-store' }); const j = await r.json(); return Boolean(r.ok && j.configured); }
+export async function getCallAvailability(activeSession=null) {
+ const route=activeSession?.route==='legacy'?'/api/livekit-token':'/api/online-livekit-token';
+ try { const r = await fetch(route, { cache: 'no-store' }); const j = await r.json(); return Boolean(r.ok && j.configured); }
  catch { return false; }
 }
 export async function connectCall(getSession, showToast = () => {}) {
@@ -171,7 +172,7 @@ export async function connectCall(getSession, showToast = () => {}) {
  let connecting = null;
  const request = new AbortController(); pendingRequest = request;
  try {
-  const response = await fetch('/api/livekit-token', {
+  const response = await fetch(session.route==='legacy'?'/api/livekit-token':'/api/online-livekit-token', {
    method: 'POST', cache: 'no-store', signal: request.signal,
    headers: {'content-type':'application/json'}, body: JSON.stringify({code:session.code, token:session.token})
   });

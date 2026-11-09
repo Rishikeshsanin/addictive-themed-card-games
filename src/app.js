@@ -92,7 +92,7 @@ async function checkRoomHealth(){
  if(!message||!create||!join)return;
  message.textContent='Checking private game servers…';create.disabled=true;join.disabled=true;
  try{
-  const response=await fetch('/api/game?health=1',{cache:'no-store'});
+  const response=await fetch('/api/online-game?health=1',{cache:'no-store'});
   const data=await response.json();
   if(response.ok&&data.status==='ready'){
    message.textContent='● ONLINE ROOMS ARE READY';message.classList.remove('offline');
@@ -125,7 +125,7 @@ function init(){
   document.querySelectorAll('[data-player-count]').forEach(option=>{const selected=option===button;option.classList.toggle('selected',selected);option.setAttribute('aria-pressed',String(selected));});
  }));
  $('create-room').onclick=()=>enterRoom('create');$('join-room').onclick=()=>enterRoom('join');$('practice-btn').onclick=startPractice;
- $('copy-code').onclick=async()=>{const code=session?.code;if(!code)return;const url=location.origin+'/?room='+code;try{await navigator.clipboard.writeText(url);toast('INVITE LINK COPIED ✦')}catch{toast('ROOM CODE: '+code)}};
+ $('copy-code').onclick=async()=>{const code=session?.code;if(!code)return;const url=location.origin+'/?room='+code+(session?.route==='legacy'?'':'&online=1');try{await navigator.clipboard.writeText(url);toast('INVITE LINK COPIED ✦')}catch{toast('ROOM CODE: '+code)}};
  $('toggle-ready').onclick=()=>toggleReady();
  $('reveal-setting').onchange=async e=>{if(!session||session.me.index!==(lobbySnapshot?.room?.hostSeat??0)||!lobbySnapshot)return;const [chosen,seconds]=e.target.value.split('-');const ok=await roomAction('settings',{mode:chosen,seconds:Number(seconds)});if(!ok)e.target.value=lobbySnapshot.room.revealSettings.mode+'-'+lobbySnapshot.room.revealSettings.seconds;};
  $('start-match').onclick=()=>roomAction('start');
@@ -151,12 +151,31 @@ function init(){
  try{const saved=JSON.parse(sessionStorage.getItem('deckverse_session')||'null');if(saved?.code&&saved?.token){session=saved;beginPolling();}}catch{}
 }
 function startPractice(){document.body.dataset.onlineTheme='pokemon';saveName();stopPolling();resetReveal();disconnectCall();callHealthChecked=false;session=null;practice=newGame({ids:DECKS[2]});game=viewFor(practice,0);game.me=0;game.practice=true;latestRound=-1;renderedRound=-1;show('battle');$('you-name').textContent=displayName().toUpperCase();$('enemy-name').textContent='RIVAL BOT';$('call-dock').classList.add('hidden');renderBattle();scheduleBot();toast('PRACTICE MODE · 50-CARD CLASSIC')}
-const API='/api/game';
-async function api(action,body={}){let response;try{response=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body})})}catch{throw Error('Cannot connect to the game server. Check your internet connection.')};const data=await response.json().catch(()=>({error:'Unexpected server response'}));if(!response.ok||data.error)throw Error(data.error||'Room request failed');return data}
+// A new room always uses the isolated tables. Old Pokémon invites still resolve
+// through the unchanged original API when their code is not found online.
+const ONLINE_API='/api/online-game',LEGACY_API='/api/game';
+async function requestRoom(route,action,body={}){
+ let response;
+ try{response=await fetch(route,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...body}),cache:'no-store'})}
+ catch{throw Error('Cannot connect to the game server. Check your internet connection.')}
+ const data=await response.json().catch(()=>({error:'Unexpected server response'}));
+ if(!response.ok||data.error){const error=Error(data.error||'Room request failed');error.status=response.status;throw error}
+ return {...data,_route:route===LEGACY_API?'legacy':'online'};
+}
+async function api(action,body={}){
+ if(action==='join'){
+  // New invite URLs pin the online endpoint; manual/legacy room-code entry
+  // falls back ONLY on a confirmed not-found (never auth or rate-limit failures).
+  const explicitOnline=new URLSearchParams(location.search).get('online')==='1';
+  try{return await requestRoom(ONLINE_API,action,body)}
+  catch(error){if(!explicitOnline&&error.status===404)return requestRoom(LEGACY_API,action,body);throw error}
+ }
+ return requestRoom(session?.route==='legacy'?LEGACY_API:ONLINE_API,action,body);
+}
 async function enterRoom(action){const name=displayName();if(name.trim().length<2){toast('PLEASE ENTER AT LEAST TWO LETTERS');return}saveName();let code=$('join-code').value.trim().toUpperCase();if(action==='join'&&!/^[A-Z0-9]{6}$/.test(code)){toast('ENTER A VALID SIX-CHARACTER ROOM CODE');return}const b=$(action==='create'?'create-room':'join-room');b.disabled=true;b.textContent='CONNECTING…';try{
   const payload=action==='create'?{name,mode,playerCount:roomSize,themeId:selectedThemeId}:{name,code};
   const data=await api(action,payload);
-  session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me,themeId:data.room.themeId||'pokemon'};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
+  session={code:data.room.code,token:data.token,mode:data.room.mode,me:data.me,themeId:data.room.themeId||'pokemon',route:data._route||'online'};sessionStorage.setItem('deckverse_session',JSON.stringify(session));updateRoom(data);beginPolling()}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=action==='create'?'CREATE PRIVATE ROOM ↗':'JOIN →'}}
 async function roomAction(action,params={}){
  if(!session||actionBusy)return false;
  actionBusy=true;
@@ -184,7 +203,7 @@ function updateRoom(data){
  lobbySnapshot=data;
  if(previousTheme!==session.themeId)renderKey='';
  document.body.dataset.onlineTheme=session.themeId;
- sessionStorage.setItem('deckverse_session',JSON.stringify({code:session.code,token:session.token,mode:session.mode,me:session.me}));
+ sessionStorage.setItem('deckverse_session',JSON.stringify({code:session.code,token:session.token,mode:session.mode,me:session.me,route:session.route||'legacy',themeId:session.themeId}));
  if(data.room.status==='lobby'){if(screen!=='lobby')show('lobby');renderLobby(data);return}
  if(data.room.status==='playing'||data.room.status==='finished'){
   if(screen!=='battle'){show('battle');resetReveal();callHealthChecked=false;}
@@ -212,7 +231,7 @@ function renderLobby(data){
 function beginPolling(){
  stopPolling();const epoch=pollEpoch;let fetching=false;
  async function heartbeat(){
-  if(epoch!==pollEpoch||!session||document.hidden||!navigator.onLine||heartbeatBusy||actionBusy)return;
+  if(epoch!==pollEpoch||!session||session.route==='legacy'||document.hidden||!navigator.onLine||heartbeatBusy||actionBusy)return;
   const original=session;heartbeatBusy=true;
   try{
    const data=await api('heartbeat',{code:original.code,token:original.token});
@@ -259,7 +278,7 @@ function playerName(i){if(practice)return i===0?displayName():'RIVAL BOT';return
 function ensureCallAvailability(){
  if(session?.mode!=='remote'||callHealthChecked)return;
  callHealthChecked=true;
- getCallAvailability().then(ok=>{
+ getCallAvailability(session).then(ok=>{
   if(!session||session.mode!=='remote')return;
   if(!ok){$('call-status').textContent='Calling requires DeckVerse LiveKit setup';$('call-note').textContent='Voice/video is not connected yet; the card game remains playable.';}
  }).catch(()=>{});
@@ -375,7 +394,7 @@ function renderBattle(){
  if(document.activeElement!==$('battle-reveal-setting'))$('battle-reveal-setting').value=settings.mode+'-'+settings.seconds;
  if(session?.mode==='remote'&&!callHealthChecked){
   callHealthChecked=true;
-  getCallAvailability().then(ok=>{
+  getCallAvailability(session).then(ok=>{
    if(!session||session.mode!=='remote')return;
    if(!ok){$('call-status').textContent='Calling requires DeckVerse LiveKit setup';$('call-note').textContent='Voice/video is not connected yet; the card game remains playable.';}
   }).catch(()=>{});
@@ -388,7 +407,7 @@ function showFinalResult(me){
  const wantsRematch=game.rematchVotes?.includes(me);
  const votes=game.rematchVotes?.length||0;
  const expected=game.playerCount||2;
- const rematchAvailable=Boolean(session&&!forfeit&&session.players?.length===expected);
+ const rematchAvailable=Boolean(session&&session.route!=='legacy'&&!forfeit&&session.players?.length===expected);
  const action=practice?'REMATCH THE BOT ↗':rematchAvailable?(wantsRematch?'✓ REMATCH REQUESTED':'⚡ PLAY AGAIN — REMATCH ↗'):'BACK TO ROOMS ↗';
  $('result').className='result-pop final '+(win?'win':'loss');
  $('result').innerHTML='<div class="result-icon">'+(win?'🏆':'⚔')+'</div><h3>'+(forfeit?(win?'YOUR RIVAL LEFT — YOU WIN':'MATCH ENDED EARLY'):(win?'THE DECK IS YOURS!':'THE RIVAL PREVAILS!'))+'</h3><p>'+game.round+' ROUNDS · '+(forfeit?'ENDED EARLY':game.total+' CARDS · ONE LEGEND')+' · MATCH '+(game.matchNumber||1)+'</p><button class="btn btn-primary" id="play-again" '+(wantsRematch?'disabled':'')+'>'+action+'</button>'+(rematchAvailable?'<small class="rematch-status">'+(wantsRematch?'Waiting for the others to agree…':votes+'/'+expected+' players requested a rematch')+'</small>':'');
